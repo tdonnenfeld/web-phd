@@ -21,7 +21,7 @@ export async function githubActivity(month:string):Promise<Activity[]> {
       getJson(`${base}/issues?state=all&since=${encodeURIComponent(start)}&per_page=100`,headers),
       getJson(`${base}/releases?per_page=30`,headers),
     ]);
-    const rows=<T,>(i:number):T[]=>calls[i].status==="fulfilled"&&Array.isArray(calls[i].value)?calls[i].value as T[]:[];
+    const rows=<T,>(i:number):T[]=>{ const result=calls[i]; return result?.status==="fulfilled"&&Array.isArray(result.value)?result.value as T[]:[]; };
     type Commit={sha:string;html_url:string;commit:{message:string;author?:{date?:string}}};
     type Item={id:number;title:string;html_url:string;created_at:string;updated_at?:string;published_at?:string;pull_request?:unknown;tag_name?:string};
     const commits=rows<Commit>(0).map(c=>({id:`github:commit:${repo}:${c.sha}`,source:"github" as const,kind:"commit",title:c.commit.message.split("\n")[0],subtitle:repo,date:c.commit.author?.date??start,url:c.html_url}));
