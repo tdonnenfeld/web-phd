@@ -18,3 +18,24 @@ jobs:
           DATABASE_URL: postgresql://phd:placeholder@localhost:5432/phd_hub
           DEV_AUTH_BYPASS: "false"
           ALLOWED_USER: theo
+
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check private HTTPS routes
+        run: |
+          set -euo pipefail
+          for path in / /journal /calendar /repositories /tasks /experiments /api/journal /knowledge/; do
+            headers="$(mktemp)"
+            code="$(curl --silent --show-error --retry 2 --max-time 15 -D "$headers" -o /dev/null -w '%{http_code}' "https://phd.les12.fr$path")"
+            echo "$path => $code"
+            case "$code" in
+              301|302|303|307|308)
+                grep -qi '^location:.*auth.les12.fr' "$headers" || { echo 'Expected Authelia redirect'; exit 1; }
+                ;;
+              401|403) ;;
+              *) echo "Unexpected unauthenticated response: $code"; exit 1 ;;
+            esac
+            rm -f "$headers"
+          done
