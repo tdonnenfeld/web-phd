@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Link2 } from "lucide-react";
 import { JournalEditor } from "./journal-editor";
 import { ResourceLinkEditor } from "./resource-link-editor";
+import { ActivityFeed } from "./activity-feed";
 import type { Entry } from "@/lib/types";
 function localKey(date: Date){return format(date,"yyyy-MM-dd");}
 export function Journal({ initialDate }: {initialDate?: string}) {
@@ -44,5 +45,6 @@ export function Journal({ initialDate }: {initialDate?: string}) {
         {e.links.length>0&&<div className="toolbar">{e.links.map(l=><a key={l.id} className="pill" target="_blank" rel="noopener noreferrer" href={l.url}><Link2 size={12}/> {l.label}</a>)}</div>}
       </article>)}</div>
     </div>
+    <ActivityFeed current={current} period={view}/>
   </div>;
 }
