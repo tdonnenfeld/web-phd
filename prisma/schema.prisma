@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Period {
+  DAY
+  WEEK
+  MONTH
+}
+model JournalEntry {
+  id        String   @id @default(cuid())
+  period    Period   @default(DAY)
+  date      DateTime @db.Date
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  links     ResourceLink[]
+  @@index([date, period])
+}
+model ResourceLink {
+  id         String @id @default(cuid())
+  journalId  String
+  source     String
+  externalId String
+  url        String
+  label      String
+  journal    JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  @@unique([journalId, source, externalId])
+}

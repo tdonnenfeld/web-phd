@@ -1,0 +1,74 @@
+# Deploy with:
+# docker compose --env-file .env -f infrastructure/compose.yml up -d --build
+services:
+  phd-web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      DEV_AUTH_BYPASS: "false"
+    networks:
+      - web
+      - internal
+      - phd_private
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=stack_web
+      - traefik.http.routers.phd.rule=Host(`phd.les12.fr`)
+      - traefik.http.routers.phd.entrypoints=websecure
+      - traefik.http.routers.phd.tls.certresolver=letsencrypt
+      - traefik.http.routers.phd.middlewares=authelia@file
+      - traefik.http.services.phd.loadbalancer.server.port=3000
+    depends_on:
+      phd-quartz:
+        condition: service_started
+
+  phd-quartz:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ../quartz/public:/usr/share/nginx/html/knowledge:ro
+      - ./nginx-quartz.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - phd_private
+
+  phd-mlflow:
+    build:
+      context: ..
+      dockerfile: infrastructure/mlflow.Dockerfile
+    restart: unless-stopped
+    environment:
+      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_DATABASE_URL}
+    volumes:
+      - ../data/mlflow:/artifacts
+    networks:
+      - internal
+      - phd_private
+    # No public port. Use SSH tunnel or authenticated private networking
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - ${MLFLOW_DATABASE_URL}
+      - --artifacts-destination
+      - /artifacts
+      - --serve-artifacts
+      - --allowed-hosts
+      - "phd-mlflow,localhost,127.0.0.1"
+
+networks:
+  web:
+    external: true
+    name: stack_web
+  internal:
+    external: true
+    name: stack_internal
+  phd_private:
+    driver: bridge
