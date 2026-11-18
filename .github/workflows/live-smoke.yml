@@ -1,0 +1,52 @@
+name: Live deployment smoke test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/live-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unauthenticated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify HTTPS and private route protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://phd.les12.fr"
+          for path in / /journal /calendar /repositories /tasks /experiments /api/journal /knowledge/; do
+            headers="$(mktemp)"
+            status="$(curl --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              -D "$headers" -o /dev/null -w "%{http_code}" \
+              --proto '=https' "$origin$path")"
+            echo "$path => HTTP $status"
+            case "$status" in
+              301|302|303|307|308)
+                location="$(grep -i '^location:' "$headers" | head -1 | sed -e 's/^[^:]*:[[:space:]]*//' -e 's/\r$//' || true)"
+                echo "  Redirect: $location"
+                if [[ "$location" != *"auth.les12.fr"* ]]; then
+                  echo "::error::Unexpected redirect, expected Authelia login"
+                  exit 1
+                fi
+                ;;
+              401|403)
+                echo "  Access denied, as expected for a private route"
+                ;;
+              *)
+                echo "::error::Unexpected status $status on $path; expected authentication redirect or denial"
+                exit 1
+                ;;
+            esac
+            rm -f "$headers"
+          done
+      - name: Test summary
+        run: |
+          echo "### Production smoke check" >> "$GITHUB_STEP_SUMMARY"
+          echo "Checked HTTPS and unauthenticated protection for all main routes." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "This test does **not** validate authenticated UI rendering, DB CRUD, integrations, or the deployed commit." >> "$GITHUB_STEP_SUMMARY"
