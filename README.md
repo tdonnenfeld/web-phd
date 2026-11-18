@@ -12,8 +12,8 @@ Private, self-hosted research journal and activity dashboard for a PhD in synchr
 - GitHub read-only commits, PRs, issues and releases, selected via GITHUB_REPOS.
 - Vikunja task reading, creation and completion through server-side REST calls.
 - MLflow experiment list and metrics read through the tracking API.
-- Resource links API for tying journal entries to exact Git commits, tasks, notes and runs.
-- Quartz reverse-proxy route at /knowledge/ (requires explicit site build).
+- In-app journal resource linking (Git commit SHA, Obsidian note, Vikunja task or MLflow run) and ResourceLink API.
+- Quartz reverse-proxy route at /knowledge/, plus opt-in approved-vault build helper (requires a configured Quartz checkout).
 - Docker Compose deployment and Authelia perimeter protection.
 
 ## Quick start
