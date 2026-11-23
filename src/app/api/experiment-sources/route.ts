@@ -8,7 +8,7 @@ export async function GET(){
       try{
         const ref=await repositoryRef(repo);
         const checks=await Promise.all(resultCandidates.map(async p=>{try{await githubFile(repo,p,ref);return p;}catch{return null;}}));
-        return {repo,ref,files:checks.filter((p):p is string=>p!==null)};
+        return {repo,ref,files:checks.filter((p):p is typeof resultCandidates[number]=>p!==null)};
       }catch{return {repo,ref:null,files:[] as string[]};}
     })),
     obsidianDailyEntries().then(list=>list.map(n=>({id:n.id,title:n.title,date:n.date.slice(0,10)}))).catch(()=>[]),
