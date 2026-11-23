@@ -85,14 +85,3 @@ export async function writeVikunjaTask(action:"create"|"update",payload:{project
   const path=action==="create"?`/api/v1/projects/${project.id}/tasks`:`/api/v1/tasks/${payload.id}`;
   return getJson(cfg.base+path,{...cfg.headers,"Content-Type":"application/json"},{method:action==="create"?"PUT":"POST",body:JSON.stringify({title:payload.title,done:payload.done,due_date:payload.due_date})});
 }
-type MlfRun={info:{run_id:string;experiment_id:string;start_time?:number;artifact_uri?:string};data?:{metrics?:Array<{key:string;value:number}>;tags?:Array<{key:string;value:string}>}};
-export async function mlflowRuns():Promise<MlfRun[]>{
-  const base=process.env.MLFLOW_URL?.replace(/\/$/,"");if(!base)return [];
-  const ex=await getJson(base+"/api/2.0/mlflow/experiments/search",{}, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({max_results:100})}) as {experiments?:Array<{experiment_id:string}>};
-  if(!ex.experiments?.length)return [];
-  const result=await getJson(base+"/api/2.0/mlflow/runs/search",{}, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({experiment_ids:ex.experiments.map(e=>e.experiment_id),max_results:100,order_by:["attributes.start_time DESC"]})}) as {runs?:MlfRun[]};
-  return result.runs??[];
-}
-export async function mlflowActivity(month:string):Promise<Activity[]>{
-  const runs=await mlflowRuns();return runs.filter(r=>r.info.start_time&&new Date(r.info.start_time).toISOString().startsWith(month)).map(r=>({id:"mlflow:run:"+r.info.run_id,source:"mlflow",kind:"experiment",title:r.data?.tags?.find(t=>t.key==="mlflow.runName")?.value??"Experiment "+r.info.run_id.slice(0,8),date:new Date(r.info.start_time!).toISOString(),url:"/experiments?run="+encodeURIComponent(r.info.run_id),subtitle:r.info.experiment_id}));
-}
