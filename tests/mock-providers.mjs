@@ -22,8 +22,6 @@ const server=createServer(async(req,res)=>{
     if(!task)return json(res,404,{error:"Not found"});
     Object.assign(task,JSON.parse(body));return json(res,200,task);
   }
-  if(req.method==="POST"&&path==="/api/2.0/mlflow/experiments/search")return json(res,200,{experiments:[{experiment_id:"5"}]});
-  if(req.method==="POST"&&path==="/api/2.0/mlflow/runs/search")return json(res,200,{runs:[{info:{run_id:"run-001",experiment_id:"5",start_time:1795003200000},data:{tags:[{key:"mlflow.runName",value:"Compression QP22"}],metrics:[{key:"psnr",value:43.2}]}}]});
   return json(res,404,{error:"Unexpected mock URL",path,method:req.method});
 });
 server.listen(3999,"127.0.0.1",()=>console.log("Mock Vikunja and MLflow ready"));
