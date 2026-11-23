@@ -18,6 +18,7 @@ export function Tasks(){
     const deadline=(t:Task)=>t.due_date||"9999-12-31";
     rows.sort((a,b)=>{
       let compare=0;
+      if((sortBy==="due_asc"||sortBy==="due_desc")&&Boolean(a.due_date)!==Boolean(b.due_date))return a.due_date?-1:1;
       switch(sortBy){
         case "due_asc": compare=deadline(a).localeCompare(deadline(b));break;
         case "due_desc": compare=deadline(b).localeCompare(deadline(a));break;
