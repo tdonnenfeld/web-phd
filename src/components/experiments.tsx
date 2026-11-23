@@ -51,7 +51,7 @@ function Report({experiment}:{experiment:Experiment}){
       <ReactMarkdown components={{
         img:({src,alt})=>{
           const url=experiment.sourceType==="github"?sourceAsset(experiment,String(src??"")):null;
-          return url?<img src={url} alt={alt??"Experiment figure"} loading="lazy"/>:<span className="muted">Figure: {alt||src||"unavailable"}</span>;
+          return url?<img src={url} alt={alt??"Experiment figure"} loading="lazy"/>:<span className="muted">Figure: {String(alt||src||"unavailable")}</span>;
         },
         a:({href,children})=>{
           let url=href||"";
