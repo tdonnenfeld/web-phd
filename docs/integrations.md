@@ -2,7 +2,7 @@
 
 ## GitHub token
 
-The GitHub Actions secret `GITHUB_TOKEN` is only available to explicitly authorized GitHub workflows. It does **not** automatically reach the production Docker container. The app requires `process.env.GITHUB_TOKEN` at runtime.
+The GitHub Actions secret `GITHUB_TOKEN` is only available to explicitly authorized GitHub workflows. It does **not** automatically reach the production Docker container. The app requires `process.env.GITHUB_TOKEN` at runtime. A read-only diagnostic on 2026-11-23 confirmed the token **is already present in the live `phd-web` container**. The persistent warning came from a page that Next.js could prerender at build time, before the production runtime token existed. The Repositories page now explicitly opts into dynamic rendering.
 
 The VPS repository's `web_phd` role renders the `.env` template using the Ansible variable `github_token`. Set the token in the **encrypted** `ansible/group_vars/vps.vault.yml` using `ansible-vault edit` locally. Do not commit the plaintext token or print its contents in CI. Apply the `web_phd` role and recreate the `phd-web` container to load the environment.
 
