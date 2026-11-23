@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const month = request.nextUrl.searchParams.get("month");
     const where = month ? { date: { gte: monthBounds(month).start, lt: monthBounds(month).end } } : {};
     const [entries, daily] = await Promise.all([db.journalEntry.findMany({ where, include: { links: true }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 500 }),obsidianDailyEntries(month??undefined)]);
-    return NextResponse.json([...entries.map(e=>({...e,source:"database" as const})),...daily].sort((a,b)=>b.date.toISOString?.().localeCompare?.(a.date.toISOString?.())??0));
+    return NextResponse.json([...entries.map(e=>({...e,source:"database" as const})),...daily].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()));
   } catch { return NextResponse.json({ error: "Could not load journal entries" }, { status: 400 }); }
 }
 export async function POST(request: NextRequest) {
