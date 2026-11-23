@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, CalendarDays, ChartNoAxesCombined, FlaskConical, GitBranch, House, ListTodo, Menu, X } from "lucide-react";
+import { BookOpen, CalendarDays, ChartNoAxesCombined, Terminal, FlaskConical, GitBranch, House, ListTodo, Menu, X } from "lucide-react";
 import { useState } from "react";
 const items = [
   { href: "/", label: "Overview", icon: House },
@@ -22,6 +22,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="sidebar-footer"><span className="status-dot"/> Private workspace <small>phd.les12.fr</small></div>
     </aside>
     {open && <button aria-label="Close menu" onClick={()=>setOpen(false)} className="overlay"/>}
-    <div className="main-area"><header className="topbar"><button className="mobile-menu icon-button" onClick={()=>setOpen(!open)} aria-label="Toggle menu">{open ? <X/> : <Menu/>}</button><span>Research workspace</span><span className="topright">Europe/Madrid</span></header><main className="content">{children}</main></div>
+    <div className="main-area"><header className="topbar"><button className="mobile-menu icon-button" onClick={()=>setOpen(!open)} aria-label="Toggle menu">{open ? <X/> : <Menu/>}</button><span className="terminal-prompt">theo@phd<span className="terminal-location">:~/research</span>$ <span style={{color:"var(--text)"}}>dashboard</span><span className="terminal-cursor">_</span></span><span className="topright">Europe/Madrid</span></header><main className="content">{children}</main></div>
   </div>;
 }

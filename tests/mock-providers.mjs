@@ -5,7 +5,7 @@ const server=createServer(async(req,res)=>{
   let body="";for await(const chunk of req)body+=chunk;
   const path=new URL(req.url,"http://localhost").pathname;
   if(req.headers.authorization!=="Bearer test-token" && path.startsWith("/api/v1/"))return json(res,401,{error:"Missing test token"});
-  if(req.method==="GET"&&path==="/api/v1/tasks/all")return json(res,200,[...tasks.values()]);
+  if(req.method==="GET"&&(path==="/api/v1/tasks"||path==="/api/v1/tasks/all"))return json(res,200,[...tasks.values()]);
   if(req.method==="PUT"&&path==="/api/v1/projects/7/tasks"){
     const input=JSON.parse(body);
     const task={id:102,title:input.title,project_id:7,done:false,created:"2026-11-18T11:00:00Z"};
