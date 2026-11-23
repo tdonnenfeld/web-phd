@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Entry, Activity } from "@/lib/types";
 type Event = {id:string;date:string;title:string;type:string;url:string};
 export function CalendarView(){
-  const [month,setMonth]=useState(new Date());const [events,setEvents]=useState<Event[]>([]);const [enabled,setEnabled]=useState(["journal","github","vikunja","mlflow"]);const [errors,setErrors]=useState<string[]>([]);
+  const [month,setMonth]=useState(new Date());const [events,setEvents]=useState<Event[]>([]);const [enabled,setEnabled]=useState(["journal","github","vikunja"]);const [errors,setErrors]=useState<string[]>([]);
   const monthKey=format(month,"yyyy-MM");
   const load=useCallback(async()=>{
     const results=await Promise.allSettled([fetch(`/api/journal?month=${monthKey}`).then(r=>r.ok?r.json():Promise.reject()),fetch(`/api/activity?month=${monthKey}`).then(r=>r.ok?r.json():Promise.reject())]);
@@ -20,12 +20,12 @@ export function CalendarView(){
   const filtered=events.filter(e=>enabled.includes(e.type));
   const toggle=(type:string)=>setEnabled(s=>s.includes(type)?s.filter(x=>x!==type):[...s,type]);
   return <div>
-    <div className="page-header"><div><div className="eyebrow">Timeline & planning</div><h1>Research calendar</h1><p className="muted">Journal, GitHub activity, experiments and Vikunja tasks.</p></div></div>
+    <div className="page-header"><div><div className="eyebrow">Timeline & planning</div><h1>Research calendar</h1><p className="muted">Journal, GitHub activity and Vikunja tasks.</p></div></div>
     <div className="panel"><div className="page-header"><h2 style={{margin:0}}>{format(month,"MMMM yyyy")}</h2><div className="toolbar"><button className="button secondary" aria-label="Previous month" onClick={()=>setMonth(m=>addMonths(m,-1))}><ChevronLeft size={17}/></button><button className="button secondary" onClick={()=>setMonth(new Date())}>Today</button><button className="button secondary" aria-label="Next month" onClick={()=>setMonth(m=>addMonths(m,1))}><ChevronRight size={17}/></button></div></div>
-    <div className="toolbar" style={{marginBottom:19}}>{[{key:"journal",label:"Journal"},{key:"github",label:"GitHub"},{key:"vikunja",label:"Tasks"},{key:"mlflow",label:"Experiments"}].map(f=><label className="pill" key={f.key}><input type="checkbox" checked={enabled.includes(f.key)} onChange={()=>toggle(f.key)}/> {f.label}</label>)}</div>
+    <div className="toolbar" style={{marginBottom:19}}>{[{key:"journal",label:"Journal"},{key:"github",label:"GitHub"},{key:"vikunja",label:"Tasks"}].map(f=><label className="pill" key={f.key}><input type="checkbox" checked={enabled.includes(f.key)} onChange={()=>toggle(f.key)}/> {f.label}</label>)}</div>
     {errors.map(e=><p className="error" key={e}>{e}</p>)}
     <div className="calendar-grid">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=><div className="calendar-weekday" key={d}>{d}</div>)}
-    {days.map(day=>{const key=format(day,"yyyy-MM-dd");const dayEvents=filtered.filter(e=>e.date===key);return <div key={key} className={`calendar-day ${!isSameMonth(day,month)?"outside":""} ${isToday(day)?"today":""}`}><Link href={"/journal/"+key} className="calendar-date">{format(day,"d")}</Link>{dayEvents.slice(0,3).map(e=><Link key={e.id} className={`calendar-event ${e.type==="vikunja"?"task":e.type==="mlflow"?"experiment":""}`} title={e.title} href={e.url}>{e.title}</Link>)}{dayEvents.length>3&&<div className="muted small">+{dayEvents.length-3} more</div>}</div>;})}</div>
+    {days.map(day=>{const key=format(day,"yyyy-MM-dd");const dayEvents=filtered.filter(e=>e.date===key);return <div key={key} className={`calendar-day ${!isSameMonth(day,month)?"outside":""} ${isToday(day)?"today":""}`}><Link href={"/journal/"+key} className="calendar-date">{format(day,"d")}</Link>{dayEvents.slice(0,3).map(e=><Link key={e.id} className={`calendar-event ${e.type==="vikunja"?"task":""}`} title={e.title} href={e.url}>{e.title}</Link>)}{dayEvents.length>3&&<div className="muted small">+{dayEvents.length-3} more</div>}</div>;})}</div>
     </div>
   </div>;
 }
