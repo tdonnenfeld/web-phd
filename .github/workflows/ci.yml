@@ -92,7 +92,6 @@ jobs:
       OBSIDIAN_DAILY_DIR: /tmp/phd-test-daily
       VIKUNJA_URL: http://127.0.0.1:3999
       VIKUNJA_TOKEN: test-token
-      MLFLOW_URL: http://127.0.0.1:3999
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 type Context = { params: Promise<{ id: string }> };
-const sources = ["github", "obsidian", "mlflow", "vikunja", "external"];
+const sources = ["github", "obsidian", "vikunja", "external"];
 export async function POST(request: NextRequest, context: Context) {
   const { id } = await context.params;
   try {

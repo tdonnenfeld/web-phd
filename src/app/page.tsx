@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const destinations = [
   { id: "01", title: "Knowledge archive", detail: "Obsidian / Quartz", href: "/knowledge/index.html" },
   { id: "02", title: "Source repositories", detail: "GitHub / commits & issues", href: "/repositories" },
-  { id: "03", title: "Experiment register", detail: "MLflow / runs & metrics", href: "/experiments" },
+  { id: "03", title: "Experiment register", detail: "GitHub / Obsidian / results", href: "/experiments" },
   { id: "04", title: "Working queue", detail: "Vikunja / PhD project", href: "/tasks" },
 ];
 
