@@ -11,7 +11,7 @@ Private, self-hosted research journal and activity dashboard for a PhD in synchr
 - Research calendar with filters for journal/GitHub/Vikunja.
 - GitHub read-only commits, PRs, issues and releases, selected via GITHUB_REPOS.
 - Vikunja task reading, creation and completion for the `PhD` project, with show/hide completed and sorting controls.
-- Research experiment register: create records from Obsidian daily notes or selected private GitHub repository Markdown reports, with pinned commit refs and on-demand figure display.
+- Editable Literature table: spreadsheet-style sorting, search, inline cells, CSV import/export, and PostgreSQL persistence.\n- Research experiment register: create records from Obsidian daily notes or selected private GitHub repository Markdown reports, with pinned commit refs and on-demand figure display.
 - In-app journal resource linking (Git commit SHA, Obsidian note, Vikunja task) and ResourceLink API.
 - Quartz reverse-proxy route at /knowledge/, plus opt-in approved-vault build helper (requires a configured Quartz checkout).
 - Docker Compose deployment and Authelia perimeter protection.
@@ -57,3 +57,8 @@ The /experiments section replaces MLflow. Each experiment stores a title, interp
 For the pipeline, the documented report path is `results/results.md`; `volcomp` documents generated plots such as `rate_distortion.png` and `slice_metrics.png`. At present, **neither repository commits its generated results in GitHub**. To display these reports and graph files within the web app, commit the selected `results.md` and its referenced PNGs to the corresponding private repository, ideally under a dedicated run folder. Until then, you can create an experiment from a committed README or a daily Obsidian note. This registration does not rerun compression or import local Slurm outputs automatically.
 
 The experiment registry is PostgreSQL-backed, and its schema is migrated on startup. Back up the `phd_hub` database before applying migrations. The app no longer needs `MLFLOW_URL`, an MLflow Docker service or an MLflow database; existing MLflow data should be retained/backed up separately rather than deleted.
+
+## Literature spreadsheet
+Visit `/literature` and choose **Import CSV**. The supplied semicolon-delimited bibliography has six columns: `Paper;Authors;Year;Journal;Image type;Notes`. The importer preserves multiline notes verbatim, accepts UTF-8/BOM, skips empty rows and prevents duplicate imports by matching paper title, authors and year. Imported and edited records live in the private `phd_hub` PostgreSQL database. **The CSV content is intentionally not committed to the public GitHub repository.** Click a cell to edit, press Enter or blur to save, and use CSV export for a backup.
+
+Back up the database before deploying the `LiteraturePaper` Prisma migration.
