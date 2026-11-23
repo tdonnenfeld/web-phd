@@ -1,10 +1,16 @@
 import { createServer } from "node:http";
-const tasks=new Map([[101,{id:101,title:"Review reconstruction results",project_id:7,done:false,due_date:"2026-11-19T12:00:00Z",created:"2026-11-18T10:00:00Z"}]]);
+const tasks=new Map([[101,{id:101,title:"Review reconstruction results",project_id:7,done:false,due_date:"2026-11-19T12:00:00Z",created:"2026-11-18T10:00:00Z"}],[201,{id:201,title:"Personal grocery shopping",project_id:8,done:false,created:"2026-11-18T10:00:00Z"}]]);
 const json=(res,status,data)=>{res.writeHead(status,{"content-type":"application/json"});res.end(JSON.stringify(data));};
 const server=createServer(async(req,res)=>{
   let body="";for await(const chunk of req)body+=chunk;
   const path=new URL(req.url,"http://localhost").pathname;
   if(req.headers.authorization!=="Bearer test-token" && path.startsWith("/api/v1/"))return json(res,401,{error:"Missing test token"});
+  if(req.method==="GET"&&path==="/api/v1/projects")return json(res,200,[{id:7,title:"PhD"},{id:8,title:"Personal"}]);
+  if(req.method==="GET"&&path==="/api/v1/projects/7/tasks")return json(res,200,[...tasks.values()].filter(t=>t.project_id===7));
+  if(req.method==="GET"&&path==="/api/v1/projects/8/tasks")return json(res,200,[...tasks.values()].filter(t=>t.project_id===8));
+  if(req.method==="GET"&&path==="/api/v1/tasks/101")return json(res,200,tasks.get(101));
+  if(req.method==="GET"&&path==="/api/v1/tasks/102")return json(res,200,tasks.get(102));
+  if(req.method==="GET"&&path==="/api/v1/tasks/201")return json(res,200,tasks.get(201));
   if(req.method==="GET"&&(path==="/api/v1/tasks"||path==="/api/v1/tasks/all"))return json(res,200,[...tasks.values()]);
   if(req.method==="PUT"&&path==="/api/v1/projects/7/tasks"){
     const input=JSON.parse(body);
