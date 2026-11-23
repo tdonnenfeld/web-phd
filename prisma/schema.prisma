@@ -44,3 +44,16 @@ model ResearchExperiment {
   updatedAt   DateTime @updatedAt
   @@index([createdAt])
 }
+
+model LiteraturePaper {
+  id        String   @id @default(cuid())
+  paper     String   @db.Text
+  authors   String   @default("") @db.Text
+  year      String   @default("")
+  journal   String   @default("") @db.Text
+  imageType String   @default("") @db.Text
+  notes     String   @default("") @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([createdAt])
+}
