@@ -35,33 +35,6 @@ services:
     networks:
       - phd_private
 
-  phd-mlflow:
-    build:
-      context: ..
-      dockerfile: infrastructure/mlflow.Dockerfile
-    restart: unless-stopped
-    environment:
-      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_DATABASE_URL}
-    volumes:
-      - ../data/mlflow:/artifacts
-    networks:
-      - internal
-      - phd_private
-    # No public port. Use SSH tunnel or authenticated private networking
-    command:
-      - mlflow
-      - server
-      - --host
-      - 0.0.0.0
-      - --port
-      - "5000"
-      - --backend-store-uri
-      - ${MLFLOW_DATABASE_URL}
-      - --artifacts-destination
-      - /artifacts
-      - --serve-artifacts
-      - --allowed-hosts
-      - "phd-mlflow,localhost,127.0.0.1"
 
 networks:
   web:
