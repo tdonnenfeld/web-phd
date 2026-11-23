@@ -32,7 +32,7 @@ export async function githubActivity(month:string):Promise<Activity[]> {
   }));
   return all.flat();
 }
-function vikunjaSettings(){const base=process.env.VIKUNJA_URL?.replace(/\\/$/,"");const token=process.env.VIKUNJA_TOKEN;if(!base||!token)return null;return {base,headers:{Authorization:`Bearer ${token}`}};}
+function vikunjaSettings(){const base=process.env.VIKUNJA_URL?.replace(/\/$/,"");const token=process.env.VIKUNJA_TOKEN;if(!base||!token)return null;return {base,headers:{Authorization:`Bearer ${token}`}};}
 type Task={id:number;title:string;done:boolean;due_date?:string|null;created?:string;updated?:string;project_id?:number};
 type VikunjaProject={id:number;title:string};
 const phdProjectName="PhD";
