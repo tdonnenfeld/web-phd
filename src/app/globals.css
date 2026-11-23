@@ -188,3 +188,17 @@ button,input,textarea,select{font-family:inherit}
 .tasks-toggle input{accent-color:var(--mauve)}
 .tasks-sort select{font-size:12px;padding:8px 10px}
 @media(max-width:700px){.tasks-heading{align-items:flex-start;flex-direction:column}.tasks-controls{gap:14px}}
+
+/* Experiment register: source-first rather than analytics cards */
+.experiment-register{border-top:1px solid var(--border);margin-top:24px}
+.experiment-item{border-bottom:1px solid var(--border)}
+.experiment-item-heading{background:transparent;border:0;color:var(--text);padding:23px 0;display:grid;grid-template-columns:112px 1fr 24px;gap:18px;text-align:left;width:100%;align-items:center}
+.experiment-item-heading:hover strong{color:var(--mauve)}
+.experiment-item-heading strong{font-family:Georgia,"Times New Roman",serif;font-size:22px;font-weight:400;display:block}
+.experiment-item-heading small{font-family:monospace;color:var(--muted);font-size:11px;display:block;margin-top:6px;overflow-wrap:anywhere}
+.experiment-item-body{padding:0 0 35px 130px}
+.experiment-summary{font-family:Georgia,serif;font-size:19px;font-style:italic;color:var(--text);white-space:pre-line}
+.experiment-report{border-top:1px solid var(--border);padding-top:18px;margin-top:24px}
+.experiment-report .markdown img{display:block;max-width:100%;height:auto;margin:16px 0 22px}
+.experiment-report .markdown h1,.experiment-report .markdown h2{font-family:Georgia,serif;font-weight:400}
+@media(max-width:750px){.experiment-item-heading{grid-template-columns:55px 1fr 20px;gap:9px}.experiment-item-body{padding-left:0}.experiment-item-heading strong{font-size:18px}}
