@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
+  // Quartz publishes folder pages at /knowledge/<vault>/index.html. Preserve
+  // trailing slashes instead of redirecting folders to extensionless paths;
+  // nginx then serves the folder index without revealing its Docker hostname.
+  skipTrailingSlashRedirect: true,
   async redirects() {
     // Quartz emits relative CSS/JS/search-index URLs. At /knowledge (no trailing
     // slash) browsers resolve them against /, causing 404s. Serve the actual
