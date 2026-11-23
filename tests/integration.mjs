@@ -79,7 +79,8 @@ try{
   const activity=await call("/api/activity?month=2026-11");assert.equal(activity.status,200);assert(activity.result.some(x=>x.source==="vikunja"),"Vikunja activity absent");assert(!activity.result.some(x=>x.id==="vikunja:task:201"),"Unrelated tasks must be excluded from calendar activity");assert(!activity.result.some(x=>x.source==="mlflow"),"MLflow should be disconnected");
   console.log("PASS: combined calendar activity feed");
 } finally {
-  if(experimentId){const result=await call("/api/experiments/"+experimentId,{method:"DELETE"});assert.equal(result.status,200);}\n  if(linkId){const result=await call("/api/links/"+linkId,{method:"DELETE"});assert.equal(result.status,200);}
+  if(experimentId){const result=await call("/api/experiments/"+experimentId,{method:"DELETE"});assert.equal(result.status,200);}
+  if(linkId){const result=await call("/api/links/"+linkId,{method:"DELETE"});assert.equal(result.status,200);}
   if(id){const result=await call("/api/journal/"+id,{method:"DELETE"});assert.equal(result.status,200);const check=await call("/api/journal?month=2026-11");assert(!check.result.some(e=>e.id===id),"Test entry leaked");}
   console.log("PASS: journal and link cleanup");
 }
