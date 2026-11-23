@@ -16,6 +16,12 @@ async function untilReady(){
   throw Error("Next.js did not start or private route protection failed");
 }
 await untilReady();
+// Quartz uses relative URLs for index.css, scripts, and static/contentIndex.json.
+// The browser must land on /knowledge/index.html, not bare /knowledge.
+const knowledge = await fetch(origin+"/knowledge",{headers:auth,redirect:"manual"});
+assert.equal(knowledge.status,307,"Quartz homepage should redirect to a folder-aware URL");
+assert.equal(knowledge.headers.get("location"),"/knowledge/index.html");
+console.log("PASS: Quartz canonical URL preserves relative static asset paths");
 try{
   const blocked=await call("/api/journal",{authenticated:false});
   assert.equal(blocked.status,401,"Unauthenticated journal must be blocked");
