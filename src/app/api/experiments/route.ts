@@ -16,8 +16,10 @@ export async function POST(request:NextRequest){
     let repository:string|null=null, sourceRef:string|null=null;
     if(body.sourceType==="github"){
       if(typeof body.repository!=="string"||!allowedRepo(body.repository)||typeof body.sourcePath!=="string"||!validRepoPath(body.sourcePath)||!body.sourcePath.toLowerCase().endsWith(".md"))throw Error("Invalid repository Markdown source");
-      repository=body.repository;sourceRef=await repositoryRef(repository);
-      await githubFile(repository,body.sourcePath,sourceRef);
+      const approvedRepository:string=body.repository;
+      const approvedRef=await repositoryRef(approvedRepository);
+      await githubFile(approvedRepository,body.sourcePath,approvedRef);
+      repository=approvedRepository;sourceRef=approvedRef;
     }else{
       if(typeof body.sourcePath!=="string"||!body.sourcePath.startsWith("obsidian:"))throw Error("Invalid note reference");
       await obsidianSource(body.sourcePath);
