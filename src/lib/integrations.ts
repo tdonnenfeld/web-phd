@@ -36,7 +36,7 @@ function vikunjaSettings(){const base=process.env.VIKUNJA_URL?.replace(/\/$/,"")
 type Task={id:number;title:string;done:boolean;due_date?:string|null;created?:string;updated?:string;project_id?:number};
 export async function vikunjaTasks():Promise<Task[]> {
   const cfg=vikunjaSettings();if(!cfg)return [];
-  const data=await getJson(cfg.base+"/api/v1/tasks/all?per_page=100",cfg.headers);
+  const data=await getJson(cfg.base+"/api/v1/tasks?per_page=100",cfg.headers);
   return Array.isArray(data)?data as Task[]:[];
 }
 export async function vikunjaActivity(month:string):Promise<Activity[]> {
