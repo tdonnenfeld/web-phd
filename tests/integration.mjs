@@ -38,13 +38,15 @@ try{
   const persisted=(await call("/api/journal?month=2026-11")).result.find(e=>e.id===id);
   assert.equal(persisted.links[0].externalId,"a".repeat(40));
   console.log("PASS: persistent journal-to-commit link");
-  const tasks=await call("/api/vikunja");assert.equal(tasks.status,200,JSON.stringify(tasks));assert.equal(tasks.result.tasks[0].id,101);
+  const tasks=await call("/api/vikunja");assert.equal(tasks.status,200,JSON.stringify(tasks));assert.equal(tasks.result.project.title,"PhD");assert.deepEqual(tasks.result.tasks.map(t=>t.id),[101],"Other-project tasks must never be returned");
+  const invalidCreate=await call("/api/vikunja",{method:"POST",body:{action:"create",projectId:8,title:"Do not create elsewhere"}});assert.notEqual(invalidCreate.status,200,"Writing to unrelated projects must be blocked");
+  const invalidUpdate=await call("/api/vikunja",{method:"POST",body:{action:"update",id:201,title:"Personal grocery shopping",done:true}});assert.notEqual(invalidUpdate.status,200,"Updating unrelated tasks must be blocked");
   const taskCreated=await call("/api/vikunja",{method:"POST",body:{action:"create",projectId:7,title:"CI task"}});assert.equal(taskCreated.status,200,JSON.stringify(taskCreated));assert.equal(taskCreated.result.id,102);
   const taskUpdated=await call("/api/vikunja",{method:"POST",body:{action:"update",id:102,title:"CI task",done:true}});assert.equal(taskUpdated.status,200);assert.equal(taskUpdated.result.done,true);
   console.log("PASS: Vikunja read/create/complete against mocked API");
   const experiments=await call("/api/experiments");assert.equal(experiments.status,200,JSON.stringify(experiments));assert.equal(experiments.result.runs[0].data.metrics[0].value,43.2);
   console.log("PASS: MLflow experiment and metric retrieval against mocked API");
-  const activity=await call("/api/activity?month=2026-11");assert.equal(activity.status,200);assert(activity.result.some(x=>x.source==="vikunja"),"Vikunja activity absent");assert(activity.result.some(x=>x.source==="mlflow"),"MLflow activity absent");
+  const activity=await call("/api/activity?month=2026-11");assert.equal(activity.status,200);assert(activity.result.some(x=>x.source==="vikunja"),"Vikunja activity absent");assert(!activity.result.some(x=>x.id==="vikunja:task:201"),"Unrelated tasks must be excluded from calendar activity");assert(activity.result.some(x=>x.source==="mlflow"),"MLflow activity absent");
   console.log("PASS: combined calendar activity feed");
 } finally {
   if(linkId){const result=await call("/api/links/"+linkId,{method:"DELETE"});assert.equal(result.status,200);}
