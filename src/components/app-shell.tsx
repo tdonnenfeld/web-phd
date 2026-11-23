@@ -1,27 +1,50 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, CalendarDays, ChartNoAxesCombined, Terminal, FlaskConical, GitBranch, House, ListTodo, Menu, X } from "lucide-react";
 import { useState } from "react";
-const items = [
-  { href: "/", label: "Overview", icon: House },
-  { href: "/journal", label: "Journal", icon: BookOpen },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/knowledge/", label: "Knowledge", icon: BookOpen },
-  { href: "/repositories", label: "Repositories", icon: GitBranch },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/experiments", label: "Experiments", icon: FlaskConical },
+import { Menu, X } from "lucide-react";
+
+const sections = [
+  { href: "/", label: "Desk", number: "01" },
+  { href: "/journal", label: "Journal", number: "02" },
+  { href: "/calendar", label: "Calendar", number: "03" },
+  { href: "/knowledge/", label: "Library", number: "04" },
+  { href: "/repositories", label: "Code", number: "05" },
+  { href: "/tasks", label: "Tasks", number: "06" },
+  { href: "/experiments", label: "Experiments", number: "07" },
 ];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  return <div className="shell">
-    <aside className={`sidebar ${open ? "opened" : ""}`}>
-      <div className="brand"><span className="brand-icon"><ChartNoAxesCombined size={22}/></span><div><strong>Research Hub</strong><small>PhD · Tomography compression</small></div></div>
-      <nav aria-label="Main navigation">{items.map(item => { const Icon = item.icon; return <Link onClick={()=>setOpen(false)} key={item.href} className={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) ? "nav-item selected" : "nav-item"} href={item.href}><Icon size={18}/>{item.label}</Link>; })}</nav>
-      <div className="sidebar-footer"><span className="status-dot"/> Private workspace <small>phd.les12.fr</small></div>
-    </aside>
-    {open && <button aria-label="Close menu" onClick={()=>setOpen(false)} className="overlay"/>}
-    <div className="main-area"><header className="topbar"><button className="mobile-menu icon-button" onClick={()=>setOpen(!open)} aria-label="Toggle menu">{open ? <X/> : <Menu/>}</button><span className="terminal-prompt">theo@phd<span className="terminal-location">:~/research</span>$ <span style={{color:"var(--text)"}}>dashboard</span><span className="terminal-cursor">_</span></span><span className="topright">Europe/Madrid</span></header><main className="content">{children}</main></div>
+  const [menuOpen, setMenuOpen] = useState(false);
+  const active = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href.replace(/\/$/, ""));
+
+  return <div className="workbench">
+    <header className="workbench-header">
+      <div className="workbench-masthead">
+        <Link href="/" className="workbench-identity" onClick={() => setMenuOpen(false)}>
+          <span className="identity-glyph" aria-hidden="true">∴</span>
+          <span><strong>FIELDNOTES</strong><small>Research / Tomography & compression</small></span>
+        </Link>
+        <div className="masthead-right">
+          <span className="masthead-edition">PERSONAL RESEARCH SYSTEM <span className="masthead-separator">/</span> BCN</span>
+          <button className="workbench-menu-button" type="button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen}>
+            {menuOpen ? <X size={20}/> : <Menu size={20}/>}
+          </button>
+        </div>
+      </div>
+      <nav className={`workbench-nav ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
+        {sections.map(s => <Link key={s.href} href={s.href} onClick={() => setMenuOpen(false)} aria-current={active(s.href) ? "page" : undefined} className={`workbench-nav-link ${active(s.href) ? "is-active" : ""}`}>
+          <span className="nav-index">{s.number}</span>{s.label}
+        </Link>)}
+        <span className="workbench-nav-tail">PRIVATE / LOCAL-FIRST</span>
+      </nav>
+    </header>
+    <main className="workbench-content">{children}</main>
+    <footer className="workbench-footer">
+      <span>FIELDNOTES <span className="footer-symbol">∴</span> A LIVING RESEARCH RECORD</span>
+      <span>CATPPUCCIN MOCHA <span className="masthead-separator">/</span> BARCELONA</span>
+    </footer>
   </div>;
 }
