@@ -33,7 +33,7 @@ function parseNote(markdown:string,day:string):{title:string;content:string}{
 }
 
 export async function obsidianDailyEntries(month?:string):Promise<Entry[]>{
-  const root=process.env.OBSIDIAN_DAILY_DIR;
+  const root=process.env.OBSIDIAN_DAILY_DIR??"";
   if(!root)return [];
   if(month&&!monthName.test(month))throw new Error("Invalid month");
   const notes:Entry[]=[];
