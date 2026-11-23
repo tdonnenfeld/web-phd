@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { obsidianDailyEntries } from "@/lib/obsidian-daily";
 import { ArrowUpRight, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 
@@ -24,6 +25,12 @@ export default async function Home() {
   } catch {
     available = false;
   }
+  // Obsidian daily notes are read-only; preserve historical database entries.
+  let daily: Awaited<ReturnType<typeof obsidianDailyEntries>> = [];
+  try { daily = await obsidianDailyEntries(); } catch { /* Keep the dashboard usable when the optional vault is unavailable. */ }
+  const journalItems = [...entries.map(e => ({id:e.id,title:e.title,date:e.date,period:e.period})), ...daily.map(e=>({id:e.id,title:e.title,date:new Date(e.date),period:e.period}))]
+    .sort((a,b)=>b.date.getTime()-a.date.getTime()).slice(0,6);
+  const journalCount=count+daily.length;
   const today = new Date();
   return <div className="desk-page">
     <section className="desk-intro">
@@ -51,9 +58,9 @@ export default async function Home() {
           <div><span className="folio-label">01 / CHRONICLE</span><h2>Latest entries</h2></div>
           <Link href="/journal" className="desk-all-link">Full journal <ArrowUpRight size={16}/></Link>
         </div>
-        {entries.length
+        {journalItems.length
           ? <div className="desk-entry-list">
-              {entries.map((e, i) => <Link className="desk-entry-row" href={`/journal/${format(e.date, "yyyy-MM-dd")}`} key={e.id}>
+              {journalItems.map((e, i) => <Link className="desk-entry-row" href={`/journal/${format(e.date, "yyyy-MM-dd")}`} key={e.id}>
                 <span className="desk-entry-index">{String(i+1).padStart(2,"0")}</span>
                 <span className="desk-entry-info"><strong>{e.title}</strong><small>{format(e.date, "d MMM yyyy")} <span className="folio-divider">/</span> {e.period.toLowerCase()}</small></span>
                 <ArrowUpRight size={18}/>
@@ -61,7 +68,7 @@ export default async function Home() {
             </div>
           : <div className="desk-empty">No entries yet. Your ongoing research log starts here. <Link href="/journal">Begin writing <ArrowRight size={14}/></Link></div>}
         <div className="desk-journal-foot">
-          <span>{count} JOURNAL {count===1 ? "ENTRY" : "ENTRIES"} ARCHIVED</span>
+          <span>{journalCount} JOURNAL {journalCount===1 ? "ENTRY" : "ENTRIES"} ARCHIVED</span>
           <span>RECORD / REFLECT / REVISIT</span>
         </div>
       </div>
