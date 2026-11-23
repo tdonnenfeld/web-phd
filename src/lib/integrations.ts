@@ -32,21 +32,57 @@ export async function githubActivity(month:string):Promise<Activity[]> {
   }));
   return all.flat();
 }
-function vikunjaSettings(){const base=process.env.VIKUNJA_URL?.replace(/\/$/,"");const token=process.env.VIKUNJA_TOKEN;if(!base||!token)return null;return {base,headers:{Authorization:`Bearer ${token}`}};}
+function vikunjaSettings(){const base=process.env.VIKUNJA_URL?.replace(/\\/$/,"");const token=process.env.VIKUNJA_TOKEN;if(!base||!token)return null;return {base,headers:{Authorization:`Bearer ${token}`}};}
 type Task={id:number;title:string;done:boolean;due_date?:string|null;created?:string;updated?:string;project_id?:number};
+type VikunjaProject={id:number;title:string};
+const phdProjectName="PhD";
+
+async function findPhdProject(cfg:NonNullable<ReturnType<typeof vikunjaSettings>>):Promise<VikunjaProject>{
+  const matches:VikunjaProject[]=[];
+  for(let page=1;page<=100;page++){
+    const data=await getJson(cfg.base+`/api/v1/projects?per_page=100&page=${page}`,cfg.headers);
+    if(!Array.isArray(data))throw new Error("Unexpected Vikunja project list response");
+    const projects=data as VikunjaProject[];
+    matches.push(...projects.filter(p=>p.title===phdProjectName&&Number.isInteger(p.id)));
+    if(projects.length<100)break;
+    if(page===100)throw new Error("Vikunja project list pagination limit reached");
+  }
+  if(matches.length!==1)throw new Error(matches.length===0?"Vikunja project 'PhD' was not found or is not accessible":"More than one Vikunja project is named 'PhD'");
+  return matches[0];
+}
+export async function vikunjaPhdProject(){
+  const cfg=vikunjaSettings();if(!cfg)return null;
+  return findPhdProject(cfg);
+}
 export async function vikunjaTasks():Promise<Task[]> {
   const cfg=vikunjaSettings();if(!cfg)return [];
-  const data=await getJson(cfg.base+"/api/v1/tasks?per_page=100",cfg.headers);
-  return Array.isArray(data)?data as Task[]:[];
+  const project=await findPhdProject(cfg);
+  const tasks:Task[]=[];
+  for(let page=1;page<=100;page++){
+    const data=await getJson(cfg.base+`/api/v1/projects/${project.id}/tasks?per_page=100&page=${page}`,cfg.headers);
+    if(!Array.isArray(data))throw new Error("Unexpected Vikunja project task response");
+    const batch=data as Task[];
+    tasks.push(...batch.filter(t=>t.project_id===project.id));
+    if(batch.length<100)break;
+    if(page===100)throw new Error("Vikunja task pagination limit reached");
+  }
+  return tasks;
 }
 export async function vikunjaActivity(month:string):Promise<Activity[]> {
   const tasks=await vikunjaTasks();return tasks.filter(t=>(t.due_date??t.created??"").startsWith(month)).map(t=>({id:`vikunja:task:${t.id}`,source:"vikunja",kind:"task",title:t.title,subtitle:t.done?"Completed":"Open",date:t.due_date??t.created??month+"-01",url:`https://tasks.les12.fr/tasks/${t.id}`,status:t.done?"done":"open"}));
 }
 export async function writeVikunjaTask(action:"create"|"update",payload:{projectId?:number;id?:number;title?:string;done?:boolean;due_date?:string|null}) {
   const cfg=vikunjaSettings();if(!cfg)throw new Error("Vikunja not configured");
-  const path=action==="create"?`/api/v1/projects/${payload.projectId}/tasks`:`/api/v1/tasks/${payload.id}`;
-  if(action==="create"&&(!Number.isInteger(payload.projectId)||!payload.title?.trim()))throw new Error("Project and task title are required");
-  if(action==="update"&&!Number.isInteger(payload.id))throw new Error("Valid task ID required");
+  const project=await findPhdProject(cfg);
+  if(action==="create"){
+    if(!payload.title?.trim())throw new Error("Task title is required");
+    if(payload.projectId!==undefined&&payload.projectId!==project.id)throw new Error("Only the PhD project can be modified");
+  }else{
+    if(!Number.isInteger(payload.id))throw new Error("Valid task ID required");
+    const existing=await getJson(cfg.base+`/api/v1/tasks/${payload.id}`,cfg.headers) as Task;
+    if(existing.project_id!==project.id)throw new Error("Only the PhD project can be modified");
+  }
+  const path=action==="create"?`/api/v1/projects/${project.id}/tasks`:`/api/v1/tasks/${payload.id}`;
   return getJson(cfg.base+path,{...cfg.headers,"Content-Type":"application/json"},{method:action==="create"?"PUT":"POST",body:JSON.stringify({title:payload.title,done:payload.done,due_date:payload.due_date})});
 }
 type MlfRun={info:{run_id:string;experiment_id:string;start_time?:number;artifact_uri?:string};data?:{metrics?:Array<{key:string;value:number}>;tags?:Array<{key:string;value:string}>}};
