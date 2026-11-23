@@ -39,6 +39,13 @@ try{
   assert(month.result.some(e=>e.id===id),"Entry must persist and appear in monthly view");
   assert(!(await call("/api/journal?month=2026-12")).result.some(e=>e.id===id),"Month filter should exclude November entry");
   console.log("PASS: journal persistence and month filtering");
+  const obsidian=month.result.find(e=>e.source==="obsidian"&&e.title==="Reconstruction notes");
+  assert(obsidian,"Obsidian daily note must appear in the journal");
+  assert.equal(obsidian.date.slice(0,10),"2026-11-20");
+  assert(obsidian.content.includes("MSE improved."),"Obsidian note Markdown must be preserved");
+  assert.equal(obsidian.period,"DAY");
+  assert.equal((await call("/api/journal?month=2026-12")).result.filter(e=>e.source==="obsidian").length,0);
+  console.log("PASS: read-only Obsidian daily note appears in journal only for its month");
   const changed=await call("/api/journal/"+id,{method:"PATCH",body:{date:"2026-11-18",title:marker+" updated",content:"Revised scientific interpretation",period:"WEEK"}});
   assert.equal(changed.status,200);
   assert.equal(changed.result.content,"Revised scientific interpretation");

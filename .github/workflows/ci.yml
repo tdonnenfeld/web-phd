@@ -89,6 +89,7 @@ jobs:
       NODE_ENV: development
       DEV_AUTH_BYPASS: "false"
       ALLOWED_USER: tester
+      OBSIDIAN_DAILY_DIR: /tmp/phd-test-daily
       VIKUNJA_URL: http://127.0.0.1:3999
       VIKUNJA_TOKEN: test-token
       MLFLOW_URL: http://127.0.0.1:3999
@@ -102,6 +103,8 @@ jobs:
       - run: npx prisma migrate deploy
       - name: Start mock integrations and app
         run: |
+          mkdir -p /tmp/phd-test-daily/Daily\ Notes
+          printf -- "---\\ntitle: Reconstruction notes\\n---\\n## Results\\nMSE improved.\\n" > "/tmp/phd-test-daily/Daily Notes/2026-11-20.md"
           node tests/mock-providers.mjs > /tmp/mock-providers.log 2>&1 &
           npm run dev -- -p 3100 > /tmp/phd-web.log 2>&1 &
       - name: Test authenticated APIs, database and adapters
