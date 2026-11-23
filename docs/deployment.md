@@ -15,8 +15,6 @@ Run SQL as a database administrator (adjust passwords; use dedicated random secr
 ```sql
 CREATE USER phd WITH PASSWORD 'REPLACE_WITH_STRONG_RANDOM_PASSWORD';
 CREATE DATABASE phd_hub OWNER phd;
-CREATE USER mlflow WITH PASSWORD 'REPLACE_WITH_ANOTHER_STRONG_RANDOM_PASSWORD';
-CREATE DATABASE mlflow OWNER mlflow;
 ```
 
 ## Application configuration
@@ -28,7 +26,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Set DATABASE_URL, MLFLOW_DATABASE_URL, ALLOWED_USER, GITHUB_REPOS, GITHUB_TOKEN and VIKUNJA_TOKEN in .env. NEVER commit this file.
+Set DATABASE_URL, ALLOWED_USER, GITHUB_REPOS, GITHUB_TOKEN and VIKUNJA_TOKEN in .env. NEVER commit this file.
 
 The Compose file uses the external network stack_internal, assuming the existing main Compose project is named stack. If names differ, adjust.
 
@@ -53,11 +51,11 @@ Until this is done, /knowledge/ returns an expected 404. This avoids accidentall
 - Verify login only works for ALLOWED_USER.
 - Verify forged Remote-User sent by the client is stripped by Traefik.
 - Verify /api/journal and /knowledge/ are protected too.
-- Verify that application and MLflow containers are not host-published.
+- Verify that application containers are not host-published.
 
 ## Backups
 
-Back up both phd_hub and mlflow PostgreSQL databases, the selected journal artifacts, data/mlflow, Quartz configuration, and .env through secure secret storage. Test a restore before production usage.
+Back up phd_hub PostgreSQL (including experiment records), the selected journal artifacts, Quartz configuration, and .env through secure secret storage. Test a restore before production usage.
 
 ## Development
 
@@ -70,3 +68,5 @@ npm run dev
 ```
 
 Only local development may use DEV_AUTH_BYPASS=true. Production middleware ignores the bypass even when set.
+
+Existing MLflow data is not removed by the web app migration. Retain its historical database/artifacts until you explicitly decommission them.
