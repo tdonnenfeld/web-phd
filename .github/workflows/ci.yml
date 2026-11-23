@@ -19,6 +19,33 @@ jobs:
           DEV_AUTH_BYPASS: "false"
           ALLOWED_USER: theo
 
+
+  quartz-nginx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Quartz folder and note rewrites without redirects
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/quartz-html/PhD"
+          printf '<!doctype html><title>Knowledge</title>' > "$RUNNER_TEMP/quartz-html/index.html"
+          printf '<!doctype html><title>PhD</title>' > "$RUNNER_TEMP/quartz-html/PhD/index.html"
+          printf '<!doctype html><title>Example</title>' > "$RUNNER_TEMP/quartz-html/PhD/example.html"
+          printf 'body{color:white}' > "$RUNNER_TEMP/quartz-html/index.css"
+          docker run -d --rm --name quartz-nginx-test \
+            -p 127.0.0.1:18080:80 \
+            -v "$PWD/infrastructure/nginx-quartz.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$RUNNER_TEMP/quartz-html:/usr/share/nginx/html/knowledge:ro" \
+            nginx:1.27-alpine
+          trap 'docker rm -f quartz-nginx-test >/dev/null 2>&1 || true' EXIT
+          docker exec quartz-nginx-test nginx -t
+          for path in /knowledge/ /knowledge/PhD /knowledge/PhD/ /knowledge/PhD/index.html /knowledge/PhD/example /knowledge/index.css; do
+            code="$(curl -sS --retry 5 --retry-connrefused --retry-delay 1 --max-time 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:18080$path")"
+            echo "$path => $code"
+            test "$code" = 200 || exit 1
+          done
+
   production-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
