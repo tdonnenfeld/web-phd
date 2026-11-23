@@ -179,3 +179,12 @@ button,input,textarea,select{font-family:inherit}
 @media(max-width:1120px){.workbench-nav-link{padding:0 13px}.workbench-nav-tail{display:none}.desk-intro{grid-template-columns:150px minmax(0,1fr)}.desk-intro-main{padding:35px 48px}.desk-mark{font-size:85px}}
 @media(max-width:830px){.workbench-masthead{padding:17px 24px;min-height:81px}.workbench-menu-button{display:inline-flex}.masthead-edition{display:none}.workbench-nav{height:auto;padding:0 24px;display:none;flex-wrap:wrap;border-top:1px solid var(--border)}.workbench-nav.is-open{display:flex}.workbench-nav-link{padding:14px 12px;flex:0 0 50%;border-bottom:1px solid var(--border)}.workbench-nav-link:first-child{padding-left:12px}.workbench-content{padding:34px 24px 75px}.workbench-footer{padding:23px 24px}.desk-intro{grid-template-columns:1fr;min-height:0}.desk-intro-side{border-right:none;border-bottom:1px solid var(--border);padding:17px 0;flex-direction:row;align-items:center}.desk-intro-side .desk-mark{display:none}.desk-dateline{max-width:none}.desk-intro-main{padding:29px 0 38px}.desk-intro-main h1{font-size:clamp(43px,8vw,67px)}.desk-columns{grid-template-columns:1fr;gap:56px}.desk-reference{max-width:none}}
 @media(max-width:520px){.workbench-identity{gap:11px}.identity-glyph{font-size:39px}.workbench-identity strong{font-size:20px}.workbench-identity small{font-size:9px;letter-spacing:0}.workbench-content{padding:25px 17px 65px}.workbench-footer{padding:18px 17px;flex-wrap:wrap;font-size:9px}.desk-intro-main h1{font-size:43px}.desk-intro-main{padding:26px 0 34px}.desk-intro-actions{gap:16px}.desk-intro{margin-bottom:37px}.desk-section-heading h2{font-size:29px}.desk-journal-foot{flex-wrap:wrap}.workbench-nav{padding:0 17px}}
+
+/* Compact, editorial task register controls */
+.tasks-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.tasks-heading h2{margin:0 0 5px}
+.tasks-controls{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.tasks-toggle,.tasks-sort{display:inline-flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);white-space:nowrap}
+.tasks-toggle input{accent-color:var(--mauve)}
+.tasks-sort select{font-size:12px;padding:8px 10px}
+@media(max-width:700px){.tasks-heading{align-items:flex-start;flex-direction:column}.tasks-controls{gap:14px}}
