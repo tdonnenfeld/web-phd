@@ -42,6 +42,7 @@ model ResearchExperiment {
   sourceRef   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  runs        ExperimentRun[]
   @@index([createdAt])
 }
 
@@ -74,5 +75,27 @@ model DatasetVariant {
   metadata  Json
   createdAt DateTime @default(now())
   dataset   ResearchDataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  runs      ExperimentRun[]
   @@unique([datasetId, variantId])
+}
+
+model ExperimentRun {
+  id               String @id @default(cuid())
+  experimentId     String
+  datasetVariantId String
+  runKey           String
+  manifest         Json
+  importedAt       DateTime @default(now())
+  experiment       ResearchExperiment @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  datasetVariant   DatasetVariant @relation(fields: [datasetVariantId], references: [id], onDelete: Restrict)
+  files            RunFile[]
+  @@unique([experimentId, runKey])
+}
+
+model RunFile {
+  runId   String
+  path    String
+  content Bytes
+  run     ExperimentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@id([runId, path])
 }

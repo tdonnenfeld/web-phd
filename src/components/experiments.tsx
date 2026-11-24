@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
+import {ExperimentRuns} from "@/components/experiment-runs";
 import ReactMarkdown from "react-markdown";
 import {ArrowUpRight,Trash2} from "lucide-react";
 
@@ -130,6 +131,7 @@ export function Experiments(){
           {e.description&&<p className="experiment-summary">{e.description}</p>}
           <div className="toolbar"><span className="muted small">Registered {new Date(e.createdAt).toLocaleDateString()}</span>{sourceLink(e)&&<a className="resource-link" href={sourceLink(e)} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}<button className="button danger" onClick={()=>void remove(e.id)}><Trash2 size={14}/> Remove record</button></div>
           <Report experiment={e}/>
+          <ExperimentRuns key={e.id} experimentId={e.id}/>
         </div>}
       </article>)}
     </div>
