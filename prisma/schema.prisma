@@ -57,3 +57,22 @@ model LiteraturePaper {
   updatedAt DateTime @updatedAt
   @@index([createdAt])
 }
+
+model ResearchDataset {
+  id          String @id
+  title       String
+  description String @default("") @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  variants    DatasetVariant[]
+}
+
+model DatasetVariant {
+  id        String @id @default(cuid())
+  datasetId String
+  variantId String
+  metadata  Json
+  createdAt DateTime @default(now())
+  dataset   ResearchDataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  @@unique([datasetId, variantId])
+}
