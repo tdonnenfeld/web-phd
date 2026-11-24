@@ -1,12 +1,14 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 
-type Variant={id:string;variantId:string;metadata:{shape:number[];dtype:string;environment:string;sha256:string;sampling:{method:string}}};
+type Variant={localManifestFound?:boolean;id:string;variantId:string;metadata:{shape:number[];dtype:string;environment:string;sha256:string;sampling:{method:string}}};
 type Dataset={id:string;title:string;description:string;variants:Variant[]};
 
 export function Datasets(){
   const [items,setItems]=useState<Dataset[]>([]);
   const [error,setError]=useState("");
+  const [warnings,setWarnings]=useState<string[]>([]);
+  const [discoveryEnabled,setDiscoveryEnabled]=useState(false);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [mode,setMode]=useState<"dataset"|"edit"|"variant"|null>(null);
@@ -21,6 +23,8 @@ export function Datasets(){
       const data=await r.json();
       if(!r.ok)throw Error(data.error);
       setItems(data.datasets);
+      setWarnings(data.warnings??[]);
+      setDiscoveryEnabled(Boolean(data.discoveryEnabled));
     }catch(e){setError(String(e));}
     finally{setLoading(false);}
   },[]);
@@ -42,6 +46,8 @@ export function Datasets(){
   const visible=items.filter(d=>(d.id+" "+d.title+" "+d.description).toLowerCase().includes(filter.toLowerCase()));
   return <div className="experiments-page">
     <div className="page-header"><div><div className="eyebrow">Acquisition / sampling / provenance</div><h1>Datasets</h1><p className="muted">A registry of original scans and derived dataset variants. No remote filesystem access.</p></div><button className="button" onClick={()=>open("dataset")}>New dataset</button></div>
+    {!loading&&!discoveryEnabled&&<p className="muted">Local dataset discovery is not configured.</p>}
+    {warnings.map(w=><p className="error" key={w}>{w}</p>)}
     {error&&<p className="error" role="alert">{error}</p>}
     {mode&&<form className="panel form" onSubmit={save}>
       <h2>{mode==="variant"?"Register variant":mode==="edit"?"Edit dataset":"Register dataset"}</h2>
@@ -51,14 +57,14 @@ export function Datasets(){
       <label className="field">Description<textarea className="textarea" maxLength={12000} value={description} onChange={e=>setDescription(e.target.value)}/></label></>}
       <div className="toolbar"><button className="button" disabled={busy}>{busy?"Saving…":"Save"}</button><button type="button" className="button secondary" disabled={busy} onClick={()=>setMode(null)}>Cancel</button></div>
     </form>}
-    <div className="toolbar spaced"><input className="input" aria-label="Search datasets" placeholder="Search datasets" value={filter} onChange={e=>setFilter(e.target.value)}/><span className="muted small">{items.length} datasets</span></div>
+    <div className="toolbar spaced"><input className="input" aria-label="Search datasets" placeholder="Search datasets" value={filter} onChange={e=>setFilter(e.target.value)}/><span className="muted small">{items.length} datasets</span><button className="button secondary" onClick={()=>void load()}>Refresh</button></div>
     <div className="experiment-register spaced">
       {loading?<p className="muted">Loading datasets…</p>:!visible.length?<div className="empty">No matching datasets.</div>:visible.map(d=><article key={d.id} className="experiment-item">
         <div className="experiment-item-body">
           <div className="folio-label">{d.id}</div><h2>{d.title}</h2><p>{d.description}</p>
           <div className="toolbar"><button className="button secondary" onClick={()=>open("edit",d)}>Edit</button><button className="button secondary" onClick={()=>open("variant",d)}>Add variant</button></div>
           {!d.variants.length&&<p className="muted spaced">No variants registered.</p>}
-          {d.variants.map(v=><details className="spaced" key={v.id}><summary>{v.variantId} · {v.metadata.environment==="palma"?"Palma / local target":"Cluster / external"} · {v.metadata.shape.join(" × ")} · {v.metadata.dtype}</summary><div className="markdown"><pre>{JSON.stringify(v.metadata,null,2)}</pre></div></details>)}
+          {d.variants.map(v=><details className="spaced" key={v.id}><summary>{v.variantId} · {v.metadata.environment==="palma"?(v.localManifestFound?"Palma / manifest found":"Palma / not discovered"):"Cluster / external"} · {v.metadata.shape.join(" × ")} · {v.metadata.dtype}</summary><div className="markdown"><pre>{JSON.stringify(v.metadata,null,2)}</pre></div></details>)}
         </div>
       </article>)}
     </div>
