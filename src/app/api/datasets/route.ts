@@ -2,12 +2,15 @@ import {NextRequest,NextResponse} from "next/server";
 import {db} from "@/lib/db";
 import {validateVariant,validId} from "@/lib/dataset-metadata";
 
+import {discoverDatasets} from "@/lib/dataset-discovery";
+
 export const dynamic="force-dynamic";
 
 export async function GET(){
   try{
+    const discovery=await discoverDatasets();
     const datasets=await db.researchDataset.findMany({orderBy:{title:"asc"},include:{variants:{orderBy:{variantId:"asc"}}}});
-    return NextResponse.json({datasets},{headers:{"Cache-Control":"private, no-store"}});
+    return NextResponse.json({datasets:datasets.map(d=>({...d,variants:d.variants.map(v=>({...v,localManifestFound:discovery.available.has(d.id+"/"+v.variantId)}))})),discoveryEnabled:discovery.enabled,warnings:discovery.warnings},{headers:{"Cache-Control":"private, no-store"}});
   }catch{return NextResponse.json({error:"Dataset registry unavailable"},{status:503});}
 }
 
