@@ -13,6 +13,7 @@ const sections = [
   { href: "/tasks", label: "Tasks", number: "06" },
   { href: "/experiments", label: "Experiments", number: "07" },
   { href: "/literature", label: "Literature", number: "08" },
+  { href: "/datasets", label: "Datasets", number: "09" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
