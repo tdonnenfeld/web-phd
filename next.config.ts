@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
+  experimental: {
+    middlewareClientMaxBodySize: 32 * 1024 * 1024,
+  },
   // Quartz publishes folder pages at /knowledge/<vault>/index.html. Preserve
   // trailing slashes instead of redirecting folders to extensionless paths;
   // nginx then serves the folder index without revealing its Docker hostname.
