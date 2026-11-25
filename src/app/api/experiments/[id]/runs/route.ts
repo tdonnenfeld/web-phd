@@ -17,6 +17,10 @@ export async function POST(request:NextRequest,{params}:Context){
     const {id}=await params;
     if(!await db.researchExperiment.findUnique({where:{id}}))throw Error("Experiment not found");
     if(request.headers.get("content-type")!=="application/zip"||!request.body)throw Error("Upload a ZIP bundle");
+    const length=request.headers.get("content-length");
+    const expected=length===null?null:Number(length);
+    if(expected!==null&&(!Number.isSafeInteger(expected)||expected<0))throw Error("Invalid Content-Length");
+    if(expected!==null&&expected>MAX_BUNDLE)return NextResponse.json({error:"ZIP exceeds 32 MiB"},{status:413});
     const reader=request.body.getReader();
     const chunks:Buffer[]=[];let size=0;
     try{
@@ -26,7 +30,10 @@ export async function POST(request:NextRequest,{params}:Context){
         chunks.push(Buffer.from(value));
       }
     }finally{reader.releaseLock();}
-    const {manifest,files}=unpackBundle(Buffer.concat(chunks));
+    if(expected!==null&&size!==expected)throw Error(`Incomplete upload: received ${size} of ${expected} bytes`);
+    const zip=Buffer.concat(chunks);
+    if(zip.length<4||zip.readUInt32LE(0)!==0x04034b50)throw Error("Upload is not a standard ZIP archive");
+    const {manifest,files}=unpackBundle(zip);
     if(manifest.experiment_id!==id)throw Error("Manifest experiment ID does not match selected experiment");
     const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId:manifest.dataset_id,variantId:manifest.variant_id}}});
     if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==manifest.dataset_sha256||variant.metadata.environment!==manifest.environment)throw Error("Register the matching dataset variant and checksum first");
