@@ -43,6 +43,7 @@ model ResearchExperiment {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   runs        ExperimentRun[]
+  launches    PalmaLaunch[]
   @@index([createdAt])
 }
 
@@ -98,4 +99,19 @@ model RunFile {
   content Bytes
   run     ExperimentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   @@id([runId, path])
+}
+
+model PalmaLaunch {
+  id           String @id
+  experimentId String
+  ratio        Int
+  pipelineCommit String @default("")
+  datasetSha   String
+  status       String
+  githubRunId  String?
+  message      String @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  experiment   ResearchExperiment @relation(fields: [experimentId], references: [id], onDelete: Restrict)
+  @@index([experimentId, createdAt])
 }
