@@ -1,4 +1,5 @@
 import {randomUUID} from "node:crypto";
+import {isDeepStrictEqual} from "node:util";
 import {open,realpath} from "node:fs/promises";
 import {constants} from "node:fs";
 import {join} from "node:path";
@@ -94,28 +95,32 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712531)`;
     const existing=await tx.experimentRun.findUnique({where:{experimentId_runKey:{experimentId:request.experimentId,runKey:key}}});
+    if(existing&&!isDeepStrictEqual(existing.manifest,manifest))throw Error("Existing imported run conflicts with local bundle");
     if(!existing)await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest,files:{create:Array.from(files,([path,content])=>({path,content:Uint8Array.from(content)}))}}});
     await tx.palmaLaunch.update({where:{id:request.id},data:{status:manifest.status,message:"Results imported",githubRunId:String(run.id)}});
   });
+}
+async function updateActive(id:string,data:{status?:string;message?:string;githubRunId?:string}){
+  await db.palmaLaunch.updateMany({where:{id,status:{in:activeStatuses}},data});
 }
 export async function syncLaunch(request:PalmaLaunch){
   try{
     const run=await getRun(request);
     if(!run){
-      if(Date.now()-request.createdAt.getTime()>10*60*1000)await db.palmaLaunch.update({where:{id:request.id},data:{status:"unknown",message:"No matching GitHub run found; check Actions before releasing this request"}});
+      if(Date.now()-request.createdAt.getTime()>10*60*1000)await updateActive(request.id,{status:"unknown",message:"No matching GitHub run found; check Actions before releasing this request"});
       return;
     }
     const githubRunId=String(run.id);
     if(run.status!=="completed"){
-      await db.palmaLaunch.update({where:{id:request.id},data:{githubRunId,status:run.status==="in_progress"?"running":"queued",message:""}});
+      await updateActive(request.id,{githubRunId,status:run.status==="in_progress"?"running":"queued",message:""});
       return;
     }
     try{await importResult(request,run);}
     catch(e){
       const missing=(e as NodeJS.ErrnoException).code==="ENOENT";
-      await db.palmaLaunch.update({where:{id:request.id},data:{githubRunId,status:run.conclusion==="success"?"import_pending":"failed",message:missing?"Workflow ended without a readable result ZIP":e instanceof Error?e.message:"Result import failed"}});
+      await updateActive(request.id,{githubRunId,status:run.conclusion==="success"?"import_pending":"failed",message:missing?"Workflow ended without a readable result ZIP":e instanceof Error?e.message:"Result import failed"});
     }
   }catch{
-    await db.palmaLaunch.update({where:{id:request.id},data:{message:"Could not refresh GitHub status; retry shortly"}});
+    await updateActive(request.id,{message:"Could not refresh GitHub status; retry shortly"});
   }
 }
