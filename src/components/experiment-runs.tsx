@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 import ReactMarkdown from "react-markdown";
+import {PalmaLaunch} from "@/components/palma-launch";
 
 type Run={id:string;runKey:string;manifest:{environment:string;dataset_id:string;variant_id:string;repository:string;commit:string;status:string;created_at:string};files:{path:string}[]};
 function fileUrl(id:string,path:string){return "/api/runs/"+encodeURIComponent(id)+"/file?"+new URLSearchParams({path});}
@@ -45,6 +46,8 @@ export function ExperimentRuns({experimentId}:{experimentId:string}){
   }
   return <section className="spaced">
     <h2>Runs</h2><p className="muted small">Experiment ID: {experimentId}</p>
+    <PalmaLaunch experimentId={experimentId} onImported={load}/>
+    <h3 className="spaced">Manual result import</h3>
     <form className="toolbar spaced" onSubmit={upload}><label className="field">Result bundle (.zip)<input type="file" accept=".zip" required onChange={e=>setFile(e.target.files?.[0]??null)}/></label><button className="button" disabled={!file||busy}>{busy?"Importing…":"Import run"}</button></form>
     {error&&<p className="error" role="alert">{error}</p>}
     {!runs.length&&<p className="muted spaced">No imported runs.</p>}
