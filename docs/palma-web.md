@@ -1,0 +1,7 @@
+# Palma web execution
+
+Merge phd-experiments PR 5 before enabling this feature. Set PHD_ACTIONS_TOKEN server-side to a fine-grained token limited to the private phd-experiments repository with Actions read/write and metadata read. Mount datasets and results read-only and set PHD_DATASETS_DIR and PHD_RESULTS_DIR. Never expose the token to the client. Existing authentication middleware remains required.
+
+Open an existing experiment, select a ratio and optionally a full commit, and click Run experiment. The current workflow supports sample_0001/quick_4rows only. Experiment ID is assigned automatically. The local manifest is checked and registered if necessary. A UUID correlates the dispatch with its GitHub workflow run; exact run ID and attempt identify the completed local ZIP. The scientific manifest and dataset checksum must match the request before importing. No archive is uploaded to GitHub.
+
+Status and result synchronization run on opening the Runs section and every 15 seconds while it remains visible, or on manual refresh. This is not a background worker. Only one active web request is allowed globally. GitHub may still accept manual runs; do not dispatch competing jobs manually. If the dispatch outcome is unknown or a successful run cannot be imported, inspect GitHub and local results before manually releasing the request. Manual ZIP import remains available. Back up PostgreSQL before deployment.
