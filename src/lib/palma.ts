@@ -12,6 +12,9 @@ import type {PalmaLaunch} from "@prisma/client";
 const workflow="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/workflows/palma-tomo.yml";
 const runApi="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/runs";
 const datasetId="sample_0001";
+const repositories={legacy:"tdonnenfeld/tomo-mct-pipeline",unified:"tdonnenfeld/tomo-compression"} as const;
+type Backend=keyof typeof repositories;
+function validBackend(value:unknown):value is Backend{return typeof value==="string"&&Object.hasOwn(repositories,value);}
 const variants={"quick_4rows":4,"slab_16rows":16,"slab_32rows":32} as const;
 type VariantId=keyof typeof variants;
 function validVariant(value:unknown):value is VariantId{return typeof value==="string"&&Object.hasOwn(variants,value);}
@@ -61,7 +64,7 @@ export async function availableVariants(){
     catch{return {id,rows:variants[id],available:false};}
   }));
 }
-export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows"){
+export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy"){
   if(!configured())throw Error("Palma execution is not configured");
   const selected=Array.isArray(input)?input:[input];
   if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
@@ -69,14 +72,15 @@ export async function launch(experimentId:string,input:unknown,commit:unknown,va
   if(!await db.researchExperiment.findUnique({where:{id:experimentId}}))throw Error("Experiment not found");
   if(!validVariant(variantId))throw Error("Unsupported detector slab");
   if(variantId!=="quick_4rows"&&ratios.length!==1)throw Error("Larger slabs initially support one ratio per run");
+  if(!validBackend(backend))throw Error("Unsupported scientific backend");
   const datasetSha=await localDataset(variantId);
   const request=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712530)`;
     if(await tx.palmaLaunch.findFirst({where:{status:{in:activeStatuses}}}))throw Error("A Palma request is already active; refresh its status first");
-    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,pipelineCommit:commit,datasetSha,status:"dispatching"}});
+    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,backend,pipelineCommit:commit,datasetSha,status:"dispatching"}});
   });
   try{
-    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId}})});
+    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId,backend}})});
     if(!response.ok){
       const status=response.status>=500?"unknown":"dispatch_failed";
       return db.palmaLaunch.update({where:{id:request.id},data:{status,message:"GitHub dispatch returned HTTP "+response.status}});
@@ -100,12 +104,13 @@ async function getRun(request:PalmaLaunch):Promise<GitHubRun|null>{
 }
 async function importResult(request:PalmaLaunch,run:GitHubRun){
   const variantId=request.variantId;
+  if(!validBackend(request.backend))throw Error("Unsupported scientific backend");
   if(!validVariant(variantId))throw Error("Unsupported requested detector slab");
   const root=process.env.PHD_RESULTS_DIR;
   if(!root)throw Error("Palma results not configured");
   const key="palma-"+run.id+"-"+run.run_attempt;
   const {manifest,files}=unpackBundle(await readFile(join(root,key+".zip"),LOCAL_BUNDLE_LIMITS.archive),LOCAL_BUNDLE_LIMITS);
-  if(manifest.experiment_id!==request.experimentId||manifest.run_id!==key||manifest.workflow_run_id!==run.id||manifest.environment!=="palma"||manifest.repository!=="tdonnenfeld/tomo-mct-pipeline"||manifest.dataset_id!==datasetId||manifest.variant_id!==variantId||manifest.dataset_sha256!==request.datasetSha||(request.pipelineCommit&&manifest.commit!==request.pipelineCommit))throw Error("Result provenance does not match request");
+  if(manifest.experiment_id!==request.experimentId||manifest.run_id!==key||manifest.workflow_run_id!==run.id||manifest.environment!=="palma"||manifest.repository!==repositories[request.backend]||manifest.dataset_id!==datasetId||manifest.variant_id!==variantId||manifest.dataset_sha256!==request.datasetSha||(request.pipelineCommit&&manifest.commit!==request.pipelineCommit))throw Error("Result provenance does not match request");
   const parameters=manifest.parameters;
   if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify(request.ratios.length?request.ratios:[request.ratio]))throw Error("Result ratio differs from request");
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");

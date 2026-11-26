@@ -2,7 +2,7 @@ import "server-only";
 import {obsidianDailyEntries} from "@/lib/obsidian-daily";
 import path from "node:path";
 
-export const experimentRepos=["tdonnenfeld/tomo-mct-pipeline","tdonnenfeld/volcomp","tdonnenfeld/codecomp"] as const;
+export const experimentRepos=["tdonnenfeld/tomo-compression","tdonnenfeld/tomo-mct-pipeline","tdonnenfeld/volcomp","tdonnenfeld/codecomp"] as const;
 export type ExperimentSourceType="github"|"obsidian";
 export const resultCandidates=["results/results.md","results.md","README.md"] as const;
 
