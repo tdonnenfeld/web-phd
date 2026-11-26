@@ -102,10 +102,15 @@ export function Experiments(){
       setTitle("");setDescription("");setCreating(false);setSelected(data.id);await load();
     }catch(e){setError(String(e));}finally{setBusy(false);}
   }
-  async function remove(id:string){
-    if(!confirm("Remove this experiment from the catalogue? The source files will not be modified."))return;
-    const r=await fetch("/api/experiments/"+encodeURIComponent(id),{method:"DELETE"});
-    if(!r.ok){setError("Could not remove experiment");return;}setSelected(null);await load();
+  async function remove(id:string,title:string){
+    if(!confirm(`Permanently delete "${title}" and all its imported runs and execution history from PhD Web? This cannot be undone. Source repositories, notes, datasets and original result files will not be deleted.`))return;
+    setBusy(true);setError("");
+    try{
+      const r=await fetch("/api/experiments/"+encodeURIComponent(id),{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:true})});
+      const data=await r.json();
+      if(!r.ok)throw Error(data.error||"Could not delete experiment");
+      setSelected(null);await load();
+    }catch(e){setError(String(e));}finally{setBusy(false);}
   }
   return <div className="experiments-page">
     <div className="page-header"><div><div className="eyebrow">Evidence / interpretation / provenance</div><h1>Experiment register</h1><p className="muted">Documented results from your repositories and Obsidian notes. No MLflow required.</p></div><button className="button" onClick={()=>setCreating(x=>!x)}>{creating?"Close":"New experiment"}</button></div>
@@ -134,7 +139,7 @@ export function Experiments(){
         </button>
         {selected===e.id&&<div className="experiment-item-body">
           {e.description&&<p className="experiment-summary">{e.description}</p>}
-          <div className="toolbar"><span className="muted small">Registered {new Date(e.createdAt).toLocaleDateString()}</span>{sourceLink(e)&&<a className="resource-link" href={sourceLink(e)} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}<button className="button danger" onClick={()=>void remove(e.id)}><Trash2 size={14}/> Remove record</button></div>
+          <div className="toolbar"><span className="muted small">Registered {new Date(e.createdAt).toLocaleDateString()}</span>{sourceLink(e)&&<a className="resource-link" href={sourceLink(e)} target="_blank" rel="noopener noreferrer">Open source <ArrowUpRight size={14}/></a>}<button className="button danger" disabled={busy} onClick={()=>void remove(e.id,e.title)}><Trash2 size={14}/> Delete experiment</button></div>
           <Report experiment={e}/>
           <ExperimentRuns key={e.id} experimentId={e.id}/>
         </div>}
