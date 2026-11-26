@@ -260,3 +260,5 @@ button,input,textarea,select{font-family:inherit}
 @keyframes phd-spin{to{transform:rotate(360deg)}}
 @keyframes phd-pulse{50%{opacity:.45}}
 @media(prefers-reduced-motion:reduce){.loading-status svg,.loading-row span{animation:none}}
+
+.comparison-scroll{overflow-x:auto}.comparison-table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}.comparison-table th,.comparison-table td{padding:9px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}.comparison-table th:first-child,.comparison-table td:first-child{text-align:left}.comparison-table th{color:var(--muted)}
