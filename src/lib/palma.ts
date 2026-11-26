@@ -5,7 +5,7 @@ import {constants} from "node:fs";
 import {join} from "node:path";
 import {db} from "@/lib/db";
 import {validateVariant} from "@/lib/dataset-metadata";
-import {MAX_BUNDLE,unpackBundle} from "@/lib/run-bundle";
+import {LOCAL_BUNDLE_LIMITS,unpackBundle} from "@/lib/run-bundle";
 import type {PalmaLaunch} from "@prisma/client";
 
 const workflow="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/workflows/palma-tomo.yml";
@@ -24,7 +24,8 @@ async function readFile(path:string,max:number){
   const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
   try{
     const stat=await file.stat();
-    if(!stat.isFile()||stat.size>max)throw Error("Invalid or oversized local file");
+    if(!stat.isFile())throw Error("Not a regular local file");
+    if(stat.size>max)throw Error(`Local file exceeds ${max} bytes (received ${stat.size} bytes)`);
     const buffer=Buffer.alloc(stat.size);
     let offset=0;
     while(offset<buffer.length){
@@ -87,21 +88,25 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   const root=process.env.PHD_RESULTS_DIR;
   if(!root)throw Error("Palma results not configured");
   const key="palma-"+run.id+"-"+run.run_attempt;
-  const {manifest,files}=unpackBundle(await readFile(join(root,key+".zip"),MAX_BUNDLE));
+  const {manifest,files}=unpackBundle(await readFile(join(root,key+".zip"),LOCAL_BUNDLE_LIMITS.archive),LOCAL_BUNDLE_LIMITS);
   if(manifest.experiment_id!==request.experimentId||manifest.run_id!==key||manifest.workflow_run_id!==run.id||manifest.environment!=="palma"||manifest.repository!=="tdonnenfeld/tomo-mct-pipeline"||manifest.dataset_id!==datasetId||manifest.variant_id!==variantId||manifest.dataset_sha256!==request.datasetSha||(request.pipelineCommit&&manifest.commit!==request.pipelineCommit))throw Error("Result provenance does not match request");
   const parameters=manifest.parameters;
   if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify(request.ratios.length?request.ratios:[request.ratio]))throw Error("Result ratio differs from request");
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});
   if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==request.datasetSha||variant.metadata.environment!=="palma")throw Error("Dataset registration changed");
-  const runFiles=Array.from(files,([path,content])=>({path,content:Uint8Array.from(content)}));
   await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712531)`;
     const existing=await tx.experimentRun.findUnique({where:{experimentId_runKey:{experimentId:request.experimentId,runKey:key}}});
     if(existing&&!isDeepStrictEqual(existing.manifest,manifest))throw Error("Existing imported run conflicts with local bundle");
-    if(!existing)await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest,files:{create:runFiles}}});
+    if(!existing){
+      const imported=await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest},select:{id:true}});
+      for(const [path,content] of files){
+        await tx.runFile.create({data:{runId:imported.id,path,content:Uint8Array.from(content)}});
+      }
+    }
     await tx.palmaLaunch.update({where:{id:request.id},data:{status:manifest.status,message:"Results imported",githubRunId:String(run.id)}});
-  },{maxWait:10000,timeout:60000});
+  },{maxWait:10000,timeout:120000});
 }
 async function updateActive(id:string,data:{status?:string;message?:string;githubRunId?:string}){
   await db.palmaLaunch.updateMany({where:{id,status:{in:activeStatuses}},data});
