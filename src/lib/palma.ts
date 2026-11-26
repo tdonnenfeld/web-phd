@@ -92,13 +92,14 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});
   if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==request.datasetSha||variant.metadata.environment!=="palma")throw Error("Dataset registration changed");
+  const runFiles=Array.from(files,([path,content])=>({path,content:Uint8Array.from(content)}));
   await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712531)`;
     const existing=await tx.experimentRun.findUnique({where:{experimentId_runKey:{experimentId:request.experimentId,runKey:key}}});
     if(existing&&!isDeepStrictEqual(existing.manifest,manifest))throw Error("Existing imported run conflicts with local bundle");
-    if(!existing)await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest,files:{create:Array.from(files,([path,content])=>({path,content:Uint8Array.from(content)}))}}});
+    if(!existing)await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest,files:{create:runFiles}}});
     await tx.palmaLaunch.update({where:{id:request.id},data:{status:manifest.status,message:"Results imported",githubRunId:String(run.id)}});
-  });
+  },{maxWait:10000,timeout:60000});
 }
 async function updateActive(id:string,data:{status?:string;message?:string;githubRunId?:string}){
   await db.palmaLaunch.updateMany({where:{id,status:{in:activeStatuses}},data});
