@@ -2,6 +2,7 @@
 import {LoadingList,LoadingStatus,LoadingImage} from "@/components/loading";
 import {useCallback,useEffect,useState} from "react";
 import ReactMarkdown from "react-markdown";
+import {RunRD} from "@/components/run-rd";
 import {RunComparison} from "@/components/run-comparison";
 import {PalmaLaunch} from "@/components/palma-launch";
 
@@ -15,8 +16,10 @@ function RunReport({run}:{run:Run}){
     fetch(fileUrl(run.id,"results.md")).then(r=>{if(!r.ok)throw Error();return r.text();}).then(t=>{if(active)setReport(t);}).catch(()=>{if(active)setReport("Report unavailable.");});
     return ()=>{active=false;};
   },[run.id,run.files.some(f=>f.path==="results.md")]);
+  const metricPath=["metrics.csv","summary.csv"].find(p=>run.files.some(f=>f.path===p));
   return <div className="experiment-report">
     <p className="muted">{run.manifest.repository} · {run.manifest.commit} · {run.manifest.created_at}</p>
+    {run.manifest.status==="completed"&&metricPath&&<RunRD key={run.id+":"+metricPath} id={run.id} path={metricPath} label={run.manifest.repository.split("/").pop()??run.runKey}/>}
     {report===null?<LoadingList label="Loading run report…" rows={2}/>:<div className="markdown"><ReactMarkdown components={{img:({src,alt})=>{
       const path=String(src??"").replace(/^\.\//,"");
       return run.files.some(f=>f.path===path)&&/\.(png|jpe?g|webp)$/i.test(path)?<LoadingImage key={path} src={fileUrl(run.id,path)} alt={alt??""}/>:<span>{alt??"Figure unavailable"}</span>;

@@ -262,3 +262,5 @@ button,input,textarea,select{font-family:inherit}
 @media(prefers-reduced-motion:reduce){.loading-status svg,.loading-row span{animation:none}}
 
 .comparison-scroll{overflow-x:auto}.comparison-table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}.comparison-table th,.comparison-table td{padding:9px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}.comparison-table th:first-child,.comparison-table td:first-child{text-align:left}.comparison-table th{color:var(--muted)}
+
+.rd-curves{min-width:0}.rd-swatch{display:inline-block;width:10px;height:10px;border-radius:50%}.rd-plot{overflow-x:auto;margin:12px 0}.rd-plot svg{display:block;width:100%;min-width:360px;max-width:880px;height:auto}.rd-plot svg text{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}.rd-plot circle{cursor:pointer}.rd-plot circle:focus{outline:none;stroke:var(--text);stroke-width:3px}.rd-readout{font-size:12px;color:var(--text);min-height:2.5em;padding:8px;border-top:1px solid var(--border);font-variant-numeric:tabular-nums}
