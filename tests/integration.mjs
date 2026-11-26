@@ -98,9 +98,19 @@ try{
   console.log("PASS: experiment creation from Obsidian, persistence, source rendering and allowlist validation");
   const activity=await call("/api/activity?month=2026-11");assert.equal(activity.status,200);assert(activity.result.some(x=>x.source==="vikunja"),"Vikunja activity absent");assert(!activity.result.some(x=>x.id==="vikunja:task:201"),"Unrelated tasks must be excluded from calendar activity");assert(!activity.result.some(x=>x.source==="mlflow"),"MLflow should be disconnected");
   console.log("PASS: combined calendar activity feed");
+  const unconfirmed=await call("/api/experiments/"+experimentId,{method:"DELETE"});
+  assert.equal(unconfirmed.status,400,"Unconfirmed deletion must be rejected");
+  const rejected=await call("/api/experiments/"+experimentId,{method:"DELETE",body:{confirm:false}});
+  assert.equal(rejected.status,400,"Explicitly declined deletion must be rejected");
+  assert((await call("/api/experiments")).result.experiments.some(e=>e.id===experimentId),"Rejected deletion must preserve experiment");
+  const deleted=await call("/api/experiments/"+experimentId,{method:"DELETE",body:{confirm:true}});
+  assert.equal(deleted.status,200,JSON.stringify(deleted));
+  assert(!(await call("/api/experiments")).result.experiments.some(e=>e.id===experimentId),"Confirmed deletion must remove experiment");
+  experimentId=undefined;
+  console.log("PASS: experiment deletion requires explicit confirmation");
 } finally {
   if(literatureId){const result=await call("/api/literature/"+literatureId,{method:"DELETE"});assert.equal(result.status,200);}
-  if(experimentId){const result=await call("/api/experiments/"+experimentId,{method:"DELETE"});assert.equal(result.status,200);}
+  if(experimentId){const result=await call("/api/experiments/"+experimentId,{method:"DELETE",body:{confirm:true}});assert.equal(result.status,200);}
   if(linkId){const result=await call("/api/links/"+linkId,{method:"DELETE"});assert.equal(result.status,200);}
   if(id){const result=await call("/api/journal/"+id,{method:"DELETE"});assert.equal(result.status,200);const check=await call("/api/journal?month=2026-11");assert(!check.result.some(e=>e.id===id),"Test entry leaked");}
   console.log("PASS: journal and link cleanup");
