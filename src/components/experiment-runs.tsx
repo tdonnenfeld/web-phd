@@ -7,7 +7,7 @@ import {RunComparison} from "@/components/run-comparison";
 import {PalmaLaunch} from "@/components/palma-launch";
 
 type Run={id:string;runKey:string;manifest:{environment:string;dataset_id:string;variant_id:string;repository:string;commit:string;status:string;created_at:string;dataset_sha256?:string;parameters?:unknown;metric_definitions?:Record<string,string>};files:{path:string}[]};
-function method(run:Run){const p=run.manifest.parameters;return p&&typeof p==="object"&&"method" in p&&typeof p.method==="string"?p.method:"mct (legacy default)";}
+function method(run:Run){const p=run.manifest.parameters;return p&&typeof p==="object"&&"method" in p&&typeof p.method==="string"?p.method:run.manifest.repository==="tdonnenfeld/tomo-mct-pipeline"?"mct (legacy)":run.runKey.startsWith("palma-")?"mct (historical)":"method unspecified";}
 function fileUrl(id:string,path:string){return "/api/runs/"+encodeURIComponent(id)+"/file?"+new URLSearchParams({path});}
 function RunReport({run}:{run:Run}){
   const [report,setReport]=useState<string|null>(null);
