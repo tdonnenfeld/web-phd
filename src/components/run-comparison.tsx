@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
+import {RDCurves} from "@/components/rd-curves";
 import {LoadingStatus} from "@/components/loading";
 import {parseMeasurements,matchMeasurements,nearlyEqual,type Measurement} from "@/lib/compare-metrics";
 
@@ -55,6 +56,7 @@ export function RunComparison({runs}:{runs:Run[]}){
     {loading&&<LoadingStatus label="Loading metrics…"/>}
     {error&&<p className="error" role="alert">{error}</p>}
     {result&&<div className="spaced">
+      <RDCurves key={left+":"+right} series={[{label:"A · "+(a?.manifest.repository.split("/").pop()??"Reference"),rows:result.a},{label:"B · "+(b?.manifest.repository.split("/").pop()??"Comparison"),rows:result.b}]}/>
       <p className="muted small">{pairs.length} matched stage/rate pairs · {result.a.length-pairs.length} unmatched in A · {result.b.length-pairs.length} unmatched in B. Matched by requested ratio when present, otherwise exact achieved BPS.</p>
       {pairs.length>0&&<div className="comparison-scroll"><table className="comparison-table"><thead><tr>{["Stage","Ratio","BPS A","BPS B","MSE A","MSE B","NMSE A","NMSE B","MSE change","Within tolerance"].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>
       {pairs.map(({left:l,right:r})=><tr key={l.stage+":"+(l.ratio??l.bps)}><td>{l.stage}</td><td>{l.ratio===null?"—":l.ratio+"×"}</td><td>{fmt(l.bps)}</td><td>{fmt(r.bps)}</td><td>{fmt(l.mse)}</td><td>{fmt(r.mse)}</td><td>{fmt(l.normalized_mse)}</td><td>{fmt(r.normalized_mse)}</td><td>{l.mse===0?"—":((r.mse-l.mse)/l.mse*100).toPrecision(4)+"%"}</td><td>{nearlyEqual(l.bps,r.bps)&&nearlyEqual(l.mse,r.mse)&&l.normalized_mse!==null&&r.normalized_mse!==null&&nearlyEqual(l.normalized_mse,r.normalized_mse)?"Yes":"No / unavailable"}</td></tr>)}
