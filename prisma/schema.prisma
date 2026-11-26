@@ -109,6 +109,7 @@ model PalmaLaunch {
   ratio        Int
   ratios       Int[] @default([])
   pipelineCommit String @default("")
+  variantId    String @default("quick_4rows")
   datasetSha   String
   status       String
   githubRunId  String?
