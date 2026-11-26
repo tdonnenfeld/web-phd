@@ -110,6 +110,8 @@ model PalmaLaunch {
   ratios       Int[] @default([])
   pipelineCommit String @default("")
   backend      String @default("legacy")
+  datasetId    String @default("sample_0001")
+  method       String @default("mct")
   projectionIndex Int @default(0)
   slices       Int[] @default([0])
   variantId    String @default("quick_4rows")

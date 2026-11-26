@@ -1,0 +1,1 @@
+ALTER TABLE "PalmaLaunch" ADD COLUMN "datasetId" TEXT NOT NULL DEFAULT 'sample_0001', ADD COLUMN "method" TEXT NOT NULL DEFAULT 'mct';

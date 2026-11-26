@@ -1,17 +1,19 @@
 import {randomUUID} from "node:crypto";
 import {isDeepStrictEqual} from "node:util";
-import {open,realpath} from "node:fs/promises";
+import {open,realpath,readdir} from "node:fs/promises";
 import {constants} from "node:fs";
 import {join} from "node:path";
 import {db} from "@/lib/db";
-import {validateVariant} from "@/lib/dataset-metadata";
+import {validateVariant,validId} from "@/lib/dataset-metadata";
 import {LOCAL_BUNDLE_LIMITS,unpackBundle} from "@/lib/run-bundle";
 import {storeRunFiles} from "@/lib/run-storage";
 import type {PalmaLaunch} from "@prisma/client";
 
 const workflow="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/workflows/palma-tomo.yml";
 const runApi="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/runs";
-const datasetId="sample_0001";
+const methods=["mct","stacked","independent"] as const;
+type Method=typeof methods[number];
+function validMethod(value:unknown):value is Method{return typeof value==="string"&&methods.some(m=>m===value); }
 const repositories={legacy:"tdonnenfeld/tomo-mct-pipeline",unified:"tdonnenfeld/tomo-compression"} as const;
 type Backend=keyof typeof repositories;
 function validBackend(value:unknown):value is Backend{return typeof value==="string"&&Object.hasOwn(repositories,value);}
@@ -43,7 +45,8 @@ async function readFile(path:string,max:number){
     return buffer;
   }finally{await file.close();}
 }
-async function localDataset(variantId:VariantId,register=true){
+async function localDataset(datasetId:string,variantId:VariantId,register=true){
+  if(!validId(datasetId))throw Error("Invalid dataset ID");
   const root=process.env.PHD_DATASETS_DIR;
   if(!root)throw Error("Palma datasets not configured");
   const base=await realpath(root);
@@ -60,12 +63,16 @@ async function localDataset(variantId:VariantId,register=true){
 }
 export async function availableVariants(){
   if(!configured())return [];
-  return Promise.all((Object.keys(variants) as VariantId[]).map(async id=>{
-    try{const info=await localDataset(id,false);return {id,rows:variants[id],projections:info.projections,available:true};}
-    catch{return {id,rows:variants[id],projections:0,available:false};}
-  }));
+  const root=process.env.PHD_DATASETS_DIR!;
+  const dirs=await readdir(root,{withFileTypes:true}).catch(()=>[]);
+  const samples=dirs.filter(d=>d.isDirectory()&&validId(d.name)).map(d=>d.name).sort();
+  const found=await Promise.all(samples.flatMap(datasetId=>(Object.keys(variants) as VariantId[]).map(async id=>{
+    try{const info=await localDataset(datasetId,id,false);return {datasetId,id,rows:variants[id],projections:info.projections,available:true};}
+    catch{return null;}
+  })));
+  return found.filter(v=>v!==null);
 }
-export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy",projectionIndex:unknown=0,sliceIndices:unknown=[0]){
+export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy",projectionIndex:unknown=0,sliceIndices:unknown=[0],datasetId:unknown="sample_0001",method:unknown="mct"){
   if(!configured())throw Error("Palma execution is not configured");
   const selected=Array.isArray(input)?input:[input];
   if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
@@ -74,17 +81,20 @@ export async function launch(experimentId:string,input:unknown,commit:unknown,va
   if(!validVariant(variantId))throw Error("Unsupported detector slab");
   if(variantId!=="quick_4rows"&&ratios.length!==1)throw Error("Larger slabs initially support one ratio per run");
   if(!validBackend(backend))throw Error("Unsupported scientific backend");
-  const {sha256:datasetSha,projections}=await localDataset(variantId);
+  if(!validId(datasetId))throw Error("Invalid dataset ID");
+  if(!validMethod(method)||backend==="legacy"&&method!=="mct")throw Error("Baseline methods require the unified scientific backend");
+  const {sha256:datasetSha,projections}=await localDataset(datasetId,variantId);
+  if(method!=="independent"&&projections%4!==0)throw Error("Stacked methods require a projection count divisible by four");
   if(typeof projectionIndex!=="number"||!Number.isSafeInteger(projectionIndex)||projectionIndex<0||projectionIndex>=projections)throw Error("Projection index outside dataset");
   if(!Array.isArray(sliceIndices)||sliceIndices.length<1||sliceIndices.length>4||new Set(sliceIndices).size!==sliceIndices.length||sliceIndices.some(i=>typeof i!=="number"||!Number.isSafeInteger(i)||i<0||i>=variants[variantId]))throw Error("Choose one to four unique reconstruction slice indices within dataset");
   const slices=(sliceIndices as number[]).slice().sort((a,b)=>a-b);
   const request=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712530)`;
     if(await tx.palmaLaunch.findFirst({where:{status:{in:activeStatuses}}}))throw Error("A Palma request is already active; refresh its status first");
-    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,backend,projectionIndex,slices,pipelineCommit:commit,datasetSha,status:"dispatching"}});
+    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,datasetId,variantId,backend,method,projectionIndex,slices,pipelineCommit:commit,datasetSha,status:"dispatching"}});
   });
   try{
-    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId,backend,projection_index:String(projectionIndex),slices:slices.join(" ")}})});
+    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId,backend,dataset:datasetId,method,projection_index:String(projectionIndex),slices:slices.join(" ")}})});
     if(!response.ok){
       const status=response.status>=500?"unknown":"dispatch_failed";
       return db.palmaLaunch.update({where:{id:request.id},data:{status,message:"GitHub dispatch returned HTTP "+response.status}});
@@ -107,7 +117,8 @@ async function getRun(request:PalmaLaunch):Promise<GitHubRun|null>{
   return run;
 }
 async function importResult(request:PalmaLaunch,run:GitHubRun){
-  const variantId=request.variantId;
+  const {datasetId,variantId}=request;
+  if(!validId(datasetId)||!validMethod(request.method))throw Error("Invalid requested dataset or method");
   if(!validBackend(request.backend))throw Error("Unsupported scientific backend");
   if(!validVariant(variantId))throw Error("Unsupported requested detector slab");
   const root=process.env.PHD_RESULTS_DIR;
@@ -118,6 +129,7 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   const parameters=manifest.parameters;
   if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify(request.ratios.length?request.ratios:[request.ratio]))throw Error("Result ratio differs from request");
   const visual=parameters as Record<string,unknown>;
+  if((visual.method??"mct")!==request.method)throw Error("Result compression method differs from request");
   if(visual.projection_index!==request.projectionIndex||!isDeepStrictEqual(visual.slices,request.slices))throw Error("Result visual indices differ from request");
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});

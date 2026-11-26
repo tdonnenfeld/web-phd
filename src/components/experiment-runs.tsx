@@ -7,6 +7,7 @@ import {RunComparison} from "@/components/run-comparison";
 import {PalmaLaunch} from "@/components/palma-launch";
 
 type Run={id:string;runKey:string;manifest:{environment:string;dataset_id:string;variant_id:string;repository:string;commit:string;status:string;created_at:string;dataset_sha256?:string;parameters?:unknown;metric_definitions?:Record<string,string>};files:{path:string}[]};
+function method(run:Run){const p=run.manifest.parameters;return p&&typeof p==="object"&&"method" in p&&typeof p.method==="string"?p.method:"mct (legacy default)";}
 function fileUrl(id:string,path:string){return "/api/runs/"+encodeURIComponent(id)+"/file?"+new URLSearchParams({path});}
 function RunReport({run}:{run:Run}){
   const [report,setReport]=useState<string|null>(null);
@@ -61,7 +62,7 @@ export function ExperimentRuns({experimentId}:{experimentId:string}){
     {!loading&&!error&&!runs.length&&<p className="muted spaced">No imported runs.</p>}
     <RunComparison runs={runs}/>
     {runs.map(run=><article className="experiment-item spaced" key={run.id}>
-      <button className="experiment-item-heading" aria-expanded={selected===run.id} onClick={()=>setSelected(selected===run.id?null:run.id)}><span className="folio-label">{run.manifest.environment}</span><span><strong>{run.runKey}</strong><small>{run.manifest.dataset_id} / {run.manifest.variant_id} · {run.manifest.status}</small></span><span>{selected===run.id?"−":"+"}</span></button>
+      <button className="experiment-item-heading" aria-expanded={selected===run.id} onClick={()=>setSelected(selected===run.id?null:run.id)}><span className="folio-label">{run.manifest.environment}</span><span><strong>{run.runKey}</strong><small>{run.manifest.dataset_id} / {run.manifest.variant_id} · {method(run)} · {run.manifest.status}</small></span><span>{selected===run.id?"−":"+"}</span></button>
       {selected===run.id&&<div className="experiment-item-body"><RunReport run={run}/></div>}
     </article>)}
   </section>;
