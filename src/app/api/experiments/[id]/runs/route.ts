@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {db} from "@/lib/db";
+import {storeRunFiles} from "@/lib/run-storage";
 import {MAX_BUNDLE,unpackBundle} from "@/lib/run-bundle";
 
 export const runtime="nodejs";
@@ -37,7 +38,8 @@ export async function POST(request:NextRequest,{params}:Context){
     if(manifest.experiment_id!==id)throw Error("Manifest experiment ID does not match selected experiment");
     const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId:manifest.dataset_id,variantId:manifest.variant_id}}});
     if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==manifest.dataset_sha256||variant.metadata.environment!==manifest.environment)throw Error("Register the matching dataset variant and checksum first");
-    const run=await db.experimentRun.create({data:{experimentId:id,datasetVariantId:variant.id,runKey:manifest.run_id,manifest,files:{create:Array.from(files,([path,content])=>({path,content:Uint8Array.from(content)}))}},select:{id:true}});
+    const artifacts=await storeRunFiles(files);
+    const run=await db.experimentRun.create({data:{experimentId:id,datasetVariantId:variant.id,runKey:manifest.run_id,manifest,files:{create:artifacts}},select:{id:true}});
     return NextResponse.json(run,{status:201});
   }catch(e){return NextResponse.json({error:e instanceof Error&&e.name==="Error"?e.message:"Invalid bundle or duplicate run"},{status:400});}
 }

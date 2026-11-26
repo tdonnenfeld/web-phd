@@ -13,6 +13,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/scripts/migrate-run-artifacts.cjs ./scripts/migrate-run-artifacts.cjs
 COPY --from=build /app/next.config.ts ./next.config.ts
 EXPOSE 3000
 CMD ["sh","-c","npx prisma migrate deploy && npm run start"]

@@ -96,7 +96,9 @@ model ExperimentRun {
 model RunFile {
   runId   String
   path    String
-  content Bytes
+  content Bytes?
+  digest  String?
+  size    Int?
   run     ExperimentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   @@id([runId, path])
 }

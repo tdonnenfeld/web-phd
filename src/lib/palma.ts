@@ -6,6 +6,7 @@ import {join} from "node:path";
 import {db} from "@/lib/db";
 import {validateVariant} from "@/lib/dataset-metadata";
 import {LOCAL_BUNDLE_LIMITS,unpackBundle} from "@/lib/run-bundle";
+import {storeRunFiles} from "@/lib/run-storage";
 import type {PalmaLaunch} from "@prisma/client";
 
 const workflow="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/workflows/palma-tomo.yml";
@@ -13,7 +14,7 @@ const runApi="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/r
 const datasetId="sample_0001",variantId="quick_4rows";
 export const activeStatuses=["dispatching","queued","running","unknown","import_pending"];
 export function configured(){
-  return Boolean(process.env.PHD_ACTIONS_TOKEN&&process.env.PHD_DATASETS_DIR&&process.env.PHD_RESULTS_DIR);
+  return Boolean(process.env.PHD_ACTIONS_TOKEN&&process.env.PHD_DATASETS_DIR&&process.env.PHD_RESULTS_DIR&&process.env.PHD_ARTIFACTS_DIR);
 }
 async function github(url:string,init:RequestInit={}){
   const token=process.env.PHD_ACTIONS_TOKEN;
@@ -95,15 +96,14 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});
   if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==request.datasetSha||variant.metadata.environment!=="palma")throw Error("Dataset registration changed");
+  const artifacts=await storeRunFiles(files);
   await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712531)`;
     const existing=await tx.experimentRun.findUnique({where:{experimentId_runKey:{experimentId:request.experimentId,runKey:key}}});
     if(existing&&!isDeepStrictEqual(existing.manifest,manifest))throw Error("Existing imported run conflicts with local bundle");
     if(!existing){
       const imported=await tx.experimentRun.create({data:{experimentId:request.experimentId,datasetVariantId:variant.id,runKey:key,manifest},select:{id:true}});
-      for(const [path,content] of files){
-        await tx.runFile.create({data:{runId:imported.id,path,content:Uint8Array.from(content)}});
-      }
+      await tx.runFile.createMany({data:artifacts.map(file=>({...file,runId:imported.id}))});
     }
     await tx.palmaLaunch.update({where:{id:request.id},data:{status:manifest.status,message:"Results imported",githubRunId:String(run.id)}});
   },{maxWait:10000,timeout:120000});
