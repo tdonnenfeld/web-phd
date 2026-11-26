@@ -54,7 +54,7 @@ export function RDCurves({series}:{series:Series[]}){
         <text transform="translate(14 154) rotate(-90)" textAnchor="middle">{metric==="mse"?"MSE":"Normalized MSE"}</text>
         {plotted.map(s=><g key={s.i} stroke={colors[s.i%colors.length]} fill={colors[s.i%colors.length]}>
           {s.points.length>1&&<polyline points={s.points.map(p=>x(p.x)+","+y(p.y)).join(" ")} fill="none" strokeWidth="2" strokeDasharray={s.i===1?"6 4":undefined}/>}
-          {s.points.map((p,j)=><circle key={j} cx={x(p.x)} cy={y(p.y)} r={active===s.i+":"+j?6:4} stroke="var(--bg)" strokeWidth="1.5" tabIndex={0} role="button" aria-label={s.label+", "+format(p.x)+" BPS, "+format(p.y)} onMouseEnter={()=>setActive(s.i+":"+j)} onFocus={()=>setActive(s.i+":"+j)} onClick={()=>setActive(s.i+":"+j)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setActive(s.i+":"+j);}}><title>{s.label}: {p.x} BPS, {p.y}</title></circle>)}
+          {s.points.map((p,j)=><circle key={j} cx={x(p.x)} cy={y(p.y)} r={active===s.i+":"+j?6:4} stroke="var(--bg)" strokeWidth="1.5" tabIndex={0} role="button" aria-label={s.label+", "+format(p.x)+" BPS, "+format(p.y)} onMouseEnter={()=>setActive(s.i+":"+j)} onFocus={()=>setActive(s.i+":"+j)} onClick={()=>setActive(s.i+":"+j)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setActive(s.i+":"+j);}}}><title>{s.label}: {p.x} BPS, {p.y}</title></circle>)}
         </g>)}
       </svg>
       <div className="rd-readout" aria-live="polite">{selected?<>{selected.label} · {selected.ratio!==null?selected.ratio+"× · ":""}{format(selected.x)} BPS · {metric==="mse"?"MSE":"NMSE"} {selected.y.toPrecision(8)}</>:"Hover, focus or select a point to inspect its measurement."}</div>
