@@ -11,7 +11,10 @@ import type {PalmaLaunch} from "@prisma/client";
 
 const workflow="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/workflows/palma-tomo.yml";
 const runApi="https://api.github.com/repos/tdonnenfeld/phd-experiments/actions/runs";
-const datasetId="sample_0001",variantId="quick_4rows";
+const datasetId="sample_0001";
+const variants={"quick_4rows":4,"slab_16rows":16,"slab_32rows":32} as const;
+type VariantId=keyof typeof variants;
+function validVariant(value:unknown):value is VariantId{return typeof value==="string"&&Object.hasOwn(variants,value);}
 export const activeStatuses=["dispatching","queued","running","unknown","import_pending"];
 export function configured(){
   return Boolean(process.env.PHD_ACTIONS_TOKEN&&process.env.PHD_DATASETS_DIR&&process.env.PHD_RESULTS_DIR&&process.env.PHD_ARTIFACTS_DIR);
@@ -37,33 +40,43 @@ async function readFile(path:string,max:number){
     return buffer;
   }finally{await file.close();}
 }
-async function localDataset(){
+async function localDataset(variantId:VariantId,register=true){
   const root=process.env.PHD_DATASETS_DIR;
   if(!root)throw Error("Palma datasets not configured");
   const base=await realpath(root);
   const dir=join(base,datasetId,variantId);
   if(await realpath(dir)!==dir)throw Error("Unexpected dataset directory");
   const metadata=validateVariant(JSON.parse((await readFile(join(dir,"manifest.json"),100000)).toString("utf8")));
-  if(metadata.dataset_id!==datasetId||metadata.variant_id!==variantId||metadata.environment!=="palma"||!Array.isArray(metadata.shape)||metadata.shape[1]!==4||typeof metadata.sha256!=="string")throw Error("Unexpected local dataset metadata");
+  if(metadata.dataset_id!==datasetId||metadata.variant_id!==variantId||metadata.environment!=="palma"||!Array.isArray(metadata.shape)||metadata.shape[1]!==variants[variantId]||typeof metadata.sha256!=="string")throw Error("Unexpected local dataset metadata");
+  if(!register)return metadata.sha256;
   await db.researchDataset.upsert({where:{id:datasetId},create:{id:datasetId,title:datasetId},update:{}});
   const variant=await db.datasetVariant.upsert({where:{datasetId_variantId:{datasetId,variantId}},create:{datasetId,variantId,metadata},update:{}});
   if(!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==metadata.sha256||variant.metadata.environment!=="palma")throw Error("Registered dataset conflicts with local manifest");
   return metadata.sha256;
 }
-export async function launch(experimentId:string,input:unknown,commit:unknown){
+export async function availableVariants(){
+  if(!configured())return [];
+  return Promise.all((Object.keys(variants) as VariantId[]).map(async id=>{
+    try{await localDataset(id,false);return {id,rows:variants[id],available:true};}
+    catch{return {id,rows:variants[id],available:false};}
+  }));
+}
+export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows"){
   if(!configured())throw Error("Palma execution is not configured");
   const selected=Array.isArray(input)?input:[input];
   if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
   const ratios=(selected as number[]).sort((a,b)=>a-b);
   if(!await db.researchExperiment.findUnique({where:{id:experimentId}}))throw Error("Experiment not found");
-  const datasetSha=await localDataset();
+  if(!validVariant(variantId))throw Error("Unsupported detector slab");
+  if(variantId!=="quick_4rows"&&ratios.length!==1)throw Error("Larger slabs initially support one ratio per run");
+  const datasetSha=await localDataset(variantId);
   const request=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712530)`;
     if(await tx.palmaLaunch.findFirst({where:{status:{in:activeStatuses}}}))throw Error("A Palma request is already active; refresh its status first");
-    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,pipelineCommit:commit,datasetSha,status:"dispatching"}});
+    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,pipelineCommit:commit,datasetSha,status:"dispatching"}});
   });
   try{
-    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" ")}})});
+    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId}})});
     if(!response.ok){
       const status=response.status>=500?"unknown":"dispatch_failed";
       return db.palmaLaunch.update({where:{id:request.id},data:{status,message:"GitHub dispatch returned HTTP "+response.status}});
@@ -86,6 +99,8 @@ async function getRun(request:PalmaLaunch):Promise<GitHubRun|null>{
   return run;
 }
 async function importResult(request:PalmaLaunch,run:GitHubRun){
+  const variantId=request.variantId;
+  if(!validVariant(variantId))throw Error("Unsupported requested detector slab");
   const root=process.env.PHD_RESULTS_DIR;
   if(!root)throw Error("Palma results not configured");
   const key="palma-"+run.id+"-"+run.run_attempt;
