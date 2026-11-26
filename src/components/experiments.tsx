@@ -1,4 +1,5 @@
 "use client";
+import {LoadingList,LoadingStatus,LoadingImage} from "@/components/loading";
 import {useCallback,useEffect,useState} from "react";
 import {ExperimentRuns} from "@/components/experiment-runs";
 import ReactMarkdown from "react-markdown";
@@ -44,15 +45,15 @@ function Report({experiment}:{experiment:Experiment}){
       const j=await r.json();if(!r.ok)throw Error(j.error??"Source unavailable");if(live){setContent(j.content);setError("");}
     }).catch(e=>{if(live)setError(String(e));});
     return ()=>{live=false;};
-  },[experiment]);
+  },[experiment.id,experiment.sourceType,experiment.repository,experiment.sourcePath,experiment.sourceRef]);
   return <div className="experiment-report">
     {error&&<p className="error">{error}</p>}
-    {content===null&&!error&&<p className="muted">Loading source report…</p>}
+    {content===null&&!error&&<LoadingList label="Loading source report…" rows={2}/>}
     {content!==null&&<div className="markdown">
       <ReactMarkdown components={{
         img:({src,alt})=>{
           const url=experiment.sourceType==="github"?sourceAsset(experiment,String(src??"")):null;
-          return url?<img src={url} alt={alt??"Experiment figure"} loading="lazy"/>:<span className="muted">Figure: {String(alt||src||"unavailable")}</span>;
+          return url?<LoadingImage key={url} src={url} alt={alt??"Experiment figure"}/>:<span className="muted">Figure: {String(alt||src||"unavailable")}</span>;
         },
         a:({href,children})=>{
           let url=href||"";
@@ -69,13 +70,15 @@ function Report({experiment}:{experiment:Experiment}){
 }
 
 export function Experiments(){
+  const [loading,setLoading]=useState(true);
+  const [sourcesLoading,setSourcesLoading]=useState(true);
   const [items,setItems]=useState<Experiment[]>([]);
   const [sources,setSources]=useState<Sources>({repos:[],notes:[]});
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
   const [creating,setCreating]=useState(false);
   const [sourceType,setSourceType]=useState<"github"|"obsidian">("github");
-  const [repo,setRepo]=useState("tdonnenfeld/tomo-mct-pipeline");
+  const [repo,setRepo]=useState("tdonnenfeld/tomo-compression");
   const [sourcePath,setSourcePath]=useState("");
   const [note,setNote]=useState("");
   const [title,setTitle]=useState("");
@@ -86,9 +89,9 @@ export function Experiments(){
       const r=await fetch("/api/experiments",{cache:"no-store"});
       const data=await r.json();if(!r.ok)throw Error(data.error);
       setItems(data.experiments??[]);setError("");
-    }catch(e){setError(String(e));}
+    }catch(e){setError(String(e));}finally{setLoading(false);}
   },[]);
-  useEffect(()=>{void load();fetch("/api/experiment-sources",{cache:"no-store"}).then(r=>r.json()).then(setSources).catch(()=>{});},[load]);
+  useEffect(()=>{void load();fetch("/api/experiment-sources",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Sources unavailable");return r.json();}).then(setSources).catch(e=>setError(String(e))).finally(()=>setSourcesLoading(false));},[load]);
   const currentRepo=sources.repos.find(r=>r.repo===repo);
   const validSource=sourceType==="obsidian"?Boolean(note):Boolean(currentRepo?.ref&&sourcePath);
   async function create(e:React.FormEvent){
@@ -109,9 +112,10 @@ export function Experiments(){
     {error&&<p className="error" role="alert">{error}</p>}
     {creating&&<form className="panel form" onSubmit={create}>
       <h2>Record an experiment</h2>
+      {sourcesLoading&&<LoadingStatus label="Loading experiment sources…"/>}
       <div className="segmented"><button type="button" className={sourceType==="github"?"active":""} onClick={()=>setSourceType("github")}>From repository</button><button type="button" className={sourceType==="obsidian"?"active":""} onClick={()=>setSourceType("obsidian")}>From Obsidian</button></div>
       {sourceType==="github"?<div className="grid two">
-        <label className="field">Repository<select value={repo} onChange={e=>{setRepo(e.target.value);setSourcePath("");}}>{["tdonnenfeld/tomo-mct-pipeline","tdonnenfeld/volcomp"].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+        <label className="field">Repository<select value={repo} onChange={e=>{setRepo(e.target.value);setSourcePath("");}}>{sources.repos.map(r=>r.repo).map(x=><option key={x} value={x}>{x}</option>)}</select></label>
         <label className="field">Markdown report<select value={sourcePath} required onChange={e=>setSourcePath(e.target.value)}><option value="">Select committed file</option>{currentRepo?.files.map(file=><option key={file} value={file}>{file}</option>)}</select></label>
         <p className="muted small">Generated reports and PNGs must be committed to the repository to display here. Until then, you can start from its README.</p>
       </div>:<label className="field">Obsidian daily note<select value={note} required onChange={e=>setNote(e.target.value)}><option value="">Select note</option>{sources.notes.map(n=><option key={n.id} value={n.id}>{n.date} · {n.title}</option>)}</select></label>}
@@ -120,7 +124,8 @@ export function Experiments(){
       <div><button className="button" disabled={busy||!validSource||!title.trim()}>{busy?"Saving…":"Create experiment"}</button></div>
     </form>}
     <div className="experiment-register">
-      {!items.length&&<div className="empty">No experiments recorded yet. Create one from a GitHub report or an Obsidian daily note.</div>}
+      {loading&&<LoadingList label="Loading experiments…"/>}
+      {!loading&&!error&&!items.length&&<div className="empty">No experiments recorded yet. Create one from a GitHub report or an Obsidian daily note.</div>}
       {items.map((e,i)=><article className="experiment-item" key={e.id}>
         <button className="experiment-item-heading" onClick={()=>setSelected(selected===e.id?null:e.id)} aria-expanded={selected===e.id}>
           <span className="folio-label">{String(i+1).padStart(2,"0")} / {e.sourceType==="github"?"CODE":"OBSIDIAN"}</span>
