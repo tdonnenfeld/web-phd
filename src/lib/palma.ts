@@ -48,18 +48,20 @@ async function localDataset(){
   if(!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==metadata.sha256||variant.metadata.environment!=="palma")throw Error("Registered dataset conflicts with local manifest");
   return metadata.sha256;
 }
-export async function launch(experimentId:string,ratio:unknown,commit:unknown){
+export async function launch(experimentId:string,input:unknown,commit:unknown){
   if(!configured())throw Error("Palma execution is not configured");
-  if(typeof ratio!=="number"||![2,4,8,16,32,64].includes(ratio)||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
+  const selected=Array.isArray(input)?input:[input];
+  if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
+  const ratios=(selected as number[]).sort((a,b)=>a-b);
   if(!await db.researchExperiment.findUnique({where:{id:experimentId}}))throw Error("Experiment not found");
   const datasetSha=await localDataset();
   const request=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712530)`;
     if(await tx.palmaLaunch.findFirst({where:{status:{in:activeStatuses}}}))throw Error("A Palma request is already active; refresh its status first");
-    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio,pipelineCommit:commit,datasetSha,status:"dispatching"}});
+    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,pipelineCommit:commit,datasetSha,status:"dispatching"}});
   });
   try{
-    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratio)}})});
+    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" ")}})});
     if(!response.ok){
       const status=response.status>=500?"unknown":"dispatch_failed";
       return db.palmaLaunch.update({where:{id:request.id},data:{status,message:"GitHub dispatch returned HTTP "+response.status}});
@@ -88,7 +90,7 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   const {manifest,files}=unpackBundle(await readFile(join(root,key+".zip"),MAX_BUNDLE));
   if(manifest.experiment_id!==request.experimentId||manifest.run_id!==key||manifest.workflow_run_id!==run.id||manifest.environment!=="palma"||manifest.repository!=="tdonnenfeld/tomo-mct-pipeline"||manifest.dataset_id!==datasetId||manifest.variant_id!==variantId||manifest.dataset_sha256!==request.datasetSha||(request.pipelineCommit&&manifest.commit!==request.pipelineCommit))throw Error("Result provenance does not match request");
   const parameters=manifest.parameters;
-  if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify([request.ratio]))throw Error("Result ratio differs from request");
+  if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify(request.ratios.length?request.ratios:[request.ratio]))throw Error("Result ratio differs from request");
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});
   if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==request.datasetSha||variant.metadata.environment!=="palma")throw Error("Dataset registration changed");
