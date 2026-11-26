@@ -16,7 +16,7 @@ export async function POST(request:NextRequest,{params}:Context){
     const {id}=await params;
     const body=await request.json();
     if(body.action==="launch"){
-      const record=await launch(id,body.ratios??body.ratio,body.commit,body.variant,body.backend,body.projectionIndex,body.slices);
+      const record=await launch(id,body.ratios??body.ratio,body.commit,body.variant,body.backend,body.projectionIndex,body.slices,body.datasetId,body.method);
       return NextResponse.json(record,{status:201});
     }
     if(body.action==="sync"){

@@ -13,6 +13,7 @@ async function read(run:Run,signal:AbortSignal){
   if(!response.ok)throw Error("Could not read metrics for "+run.runKey);
   return parseMeasurements(await response.text());
 }
+function method(run:Run){const p=run.manifest.parameters;return p&&typeof p==="object"&&"method" in p&&typeof p.method==="string"?p.method:run.manifest.repository==="tdonnenfeld/tomo-mct-pipeline"?"mct (legacy)":run.runKey.startsWith("palma-")?"mct (historical)":"method unspecified";}
 const fmt=(x:number|null)=>x===null?"—":x.toPrecision(6);
 function canonical(value:unknown):string{
   if(Array.isArray(value))return "["+value.map(canonical).join(",")+"]";
@@ -23,24 +24,27 @@ export function RunComparison({runs}:{runs:Run[]}){
   const eligible=runs.filter(r=>r.manifest.status==="completed"&&metricFile(r));
   const [left,setLeft]=useState("");
   const [right,setRight]=useState("");
-  const [result,setResult]=useState<{a:Measurement[];b:Measurement[]}|null>(null);
+  const [extras,setExtras]=useState<string[]>([]);
+  const [result,setResult]=useState<{a:Measurement[];b:Measurement[];extra:{label:string;rows:Measurement[]}[]}|null>(null);
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
   const a=eligible.find(r=>r.id===left),b=eligible.find(r=>r.id===right);
+  const additional=extras.filter(id=>id!==left&&id!==right).flatMap(id=>eligible.filter(r=>r.id===id));
+  const extraKey=additional.map(r=>r.id).join(":");
   useEffect(()=>{
     setResult(null);setError("");
     if(!a||!b||left===right){setLoading(false);return;}
     const controller=new AbortController();
     setLoading(true);
-    Promise.all([read(a,controller.signal),read(b,controller.signal)]).then(([a,b])=>{if(!controller.signal.aborted)setResult({a,b});}).catch(e=>{if(!controller.signal.aborted)setError(String(e));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    Promise.all([read(a,controller.signal),read(b,controller.signal),Promise.all(additional.map(async r=>({label:r.manifest.dataset_id+" / "+method(r)+" · "+r.runKey,rows:await read(r,controller.signal)})))]).then(([a,b,extra])=>{if(!controller.signal.aborted)setResult({a,b,extra});}).catch(e=>{if(!controller.signal.aborted)setError(String(e));}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return ()=>controller.abort();
-  },[left,right,Boolean(a),Boolean(b)]);
+  },[left,right,Boolean(a),Boolean(b),extraKey]);
   if(eligible.length<2)return null;
   const sameDataset=Boolean(a?.manifest.dataset_sha256&&a.manifest.dataset_sha256===b?.manifest.dataset_sha256&&a.manifest.dataset_id===b?.manifest.dataset_id&&a.manifest.variant_id===b?.manifest.variant_id);
   const sameParameters=Boolean(a?.manifest.parameters&&b?.manifest.parameters&&canonical(a.manifest.parameters)===canonical(b.manifest.parameters));
   const sameDefinitions=Boolean(a?.manifest.metric_definitions&&b?.manifest.metric_definitions&&canonical(a.manifest.metric_definitions)===canonical(b.manifest.metric_definitions));
   const pairs=result?matchMeasurements(result.a,result.b):[];
-  const label=(r:Run)=>r.runKey+" · "+r.manifest.repository.split("/").pop()+" · "+r.manifest.variant_id;
+  const label=(r:Run)=>r.runKey+" · "+r.manifest.dataset_id+"/"+r.manifest.variant_id+" · "+method(r)+" · "+r.manifest.repository.split("/").pop();
   return <section className="panel spaced">
     <h3>Compare runs</h3>
     <p className="muted small">Compare imported metrics without rerunning the experiments.</p>
@@ -48,15 +52,18 @@ export function RunComparison({runs}:{runs:Run[]}){
       <label className="field">Reference run<select value={left} onChange={e=>setLeft(e.target.value)}><option value="">Select run</option>{eligible.map(r=><option key={r.id} value={r.id} disabled={r.id===right}>{label(r)}</option>)}</select></label>
       <label className="field">Comparison run<select value={right} onChange={e=>setRight(e.target.value)}><option value="">Select run</option>{eligible.map(r=><option key={r.id} value={r.id} disabled={r.id===left}>{label(r)}</option>)}</select></label>
     </div>
+    {a&&b&&eligible.length>2&&<details className="spaced"><summary>Additional RD curves ({additional.length}/4)</summary><div className="list">{eligible.filter(r=>r.id!==left&&r.id!==right).map(r=><label key={r.id} className="toolbar"><input type="checkbox" checked={extras.includes(r.id)} disabled={!extras.includes(r.id)&&additional.length>=4} onChange={e=>setExtras(old=>e.target.checked?[...old.filter(id=>id!==left&&id!==right),r.id]:old.filter(id=>id!==r.id))}/> {label(r)}</label>)}</div><p className="muted small">Additional runs are plotted descriptively. The numerical table and provenance checks below apply to A and B only.</p></details>}
     {a&&b&&<div className="spaced">
-      <p className="muted small">A: {a.manifest.repository} @ {a.manifest.commit.slice(0,12)}<br/>B: {b.manifest.repository} @ {b.manifest.commit.slice(0,12)}</p>
+      <p className="muted small">A: {a.manifest.dataset_id} / {method(a)} · {a.manifest.repository} @ {a.manifest.commit.slice(0,12)}<br/>B: {b.manifest.dataset_id} / {method(b)} · {b.manifest.repository} @ {b.manifest.commit.slice(0,12)}</p>
       <p className="muted small">Dataset checksum: {sameDataset?"matches":"different or unavailable"} · Parameters: {sameParameters?"match":"different or unavailable"} · Metric definitions: {sameDefinitions?"match":"different or unavailable"}</p>
       {(!sameDataset||!sameParameters||!sameDefinitions)&&<p className="notice">These runs are not established as equivalent experimental conditions. Compare descriptively; do not infer numerical equivalence.</p>}
     </div>}
     {loading&&<LoadingStatus label="Loading metrics…"/>}
     {error&&<p className="error" role="alert">{error}</p>}
     {result&&<div className="spaced">
-      <RDCurves key={left+":"+right} series={[{label:"A · "+(a?.manifest.repository.split("/").pop()??"Reference"),rows:result.a},{label:"B · "+(b?.manifest.repository.split("/").pop()??"Comparison"),rows:result.b}]}/>
+      <RDCurves key={left+":"+right+":"+extraKey} series={[{label:"A · "+(a?a.manifest.dataset_id+" / "+method(a):"Reference"),rows:result.a},{label:"B · "+(b?b.manifest.dataset_id+" / "+method(b):"Comparison"),rows:result.b},...result.extra]}/>
+      <p className="muted small">Cross-method or cross-sample differences at equal requested ratios may reflect different achieved bitrates. Compare curves at overlapping achieved BPS; NMSE uses each run’s own reference range.</p>
+      <h3>Pairwise metrics (A/B)</h3>
       <p className="muted small">{pairs.length} matched stage/rate pairs · {result.a.length-pairs.length} unmatched in A · {result.b.length-pairs.length} unmatched in B. Matched by requested ratio when present, otherwise exact achieved BPS.</p>
       {pairs.length>0&&<div className="comparison-scroll"><table className="comparison-table"><thead><tr>{["Stage","Ratio","BPS A","BPS B","MSE A","MSE B","NMSE A","NMSE B","MSE change","Within tolerance"].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>
       {pairs.map(({left:l,right:r})=><tr key={l.stage+":"+(l.ratio??l.bps)}><td>{l.stage}</td><td>{l.ratio===null?"—":l.ratio+"×"}</td><td>{fmt(l.bps)}</td><td>{fmt(r.bps)}</td><td>{fmt(l.mse)}</td><td>{fmt(r.mse)}</td><td>{fmt(l.normalized_mse)}</td><td>{fmt(r.normalized_mse)}</td><td>{l.mse===0?"—":((r.mse-l.mse)/l.mse*100).toPrecision(4)+"%"}</td><td>{nearlyEqual(l.bps,r.bps)&&nearlyEqual(l.mse,r.mse)&&l.normalized_mse!==null&&r.normalized_mse!==null&&nearlyEqual(l.normalized_mse,r.normalized_mse)?"Yes":"No / unavailable"}</td></tr>)}
