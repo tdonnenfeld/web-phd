@@ -105,6 +105,7 @@ model PalmaLaunch {
   id           String @id
   experimentId String
   ratio        Int
+  ratios       Int[] @default([])
   pipelineCommit String @default("")
   datasetSha   String
   status       String
