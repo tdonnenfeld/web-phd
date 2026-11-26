@@ -1,10 +1,13 @@
 "use client";
+import {LoadingList,LoadingStatus} from "@/components/loading";
 import {useEffect,useMemo,useState} from "react";
 
 type Task={id:number;title:string;done:boolean;project_id?:number;due_date?:string|null;created?:string|null};
 type SortKey="due_asc"|"due_desc"|"created_desc"|"title_asc"|"status";
 
 export function Tasks(){
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState(false);
   const [tasks,setTasks]=useState<Task[]>([]);
   const [configured,setConfigured]=useState(false);
   const [error,setError]=useState("");
@@ -40,21 +43,22 @@ export function Tasks(){
       setConfigured(data.configured);
       setProjectId(data.project?.id??null);
       setError("");
-    }catch(e){setError(String(e));}
+    }catch(e){setError(String(e));}finally{setLoading(false);}
   }
   useEffect(()=>{void load();},[]);
   async function action(payload:Record<string,unknown>){
+    setBusy(true);
     try{
       const r=await fetch("/api/vikunja",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       if(!r.ok)throw Error("Could not update Vikunja");
       setTitle("");await load();
-    }catch(e){setError(String(e));}
+    }catch(e){setError(String(e));}finally{setBusy(false);}
   }
 
   const doneCount=tasks.filter(t=>t.done).length;
   return <div>
     <div className="page-header"><div><div className="eyebrow">Planning & execution</div><h1>Tasks</h1><p className="muted">PhD project in Vikunja. All changes are saved to that project.</p></div></div>
-    {!configured&&<div className="notice">Vikunja integration needs a server-side VIKUNJA_TOKEN.</div>}
+    {!loading&&!error&&!configured&&<div className="notice">Vikunja integration needs a server-side VIKUNJA_TOKEN.</div>}
     {error&&<p className="error">{error}</p>}
     <form className="panel form" onSubmit={e=>{e.preventDefault();void action({action:"create",projectId,title});}}>
       <h2>New task</h2>
@@ -62,7 +66,7 @@ export function Tasks(){
         <div className="field">Project<div className="pill">PhD</div></div>
         <label className="field">Task title<input className="input" required value={title} onChange={e=>setTitle(e.target.value)}/></label>
       </div>
-      <div><button disabled={!configured||projectId===null} className="button">Create in Vikunja</button></div>
+      <div><button disabled={loading||busy||!configured||projectId===null} className="button">{busy?<LoadingStatus label="Saving…"/>:"Create in Vikunja"}</button></div>
     </form>
     <section className="panel spaced">
       <div className="tasks-heading">
@@ -80,11 +84,12 @@ export function Tasks(){
       </div>
       <div className="list">
         {visible.map(task=><label key={task.id} className="list-item">
-          <div className="toolbar"><input aria-label={"Complete "+task.title} type="checkbox" checked={task.done} onChange={e=>void action({action:"update",id:task.id,done:e.target.checked,title:task.title})}/>
+          <div className="toolbar"><input aria-label={"Complete "+task.title} type="checkbox" disabled={busy} checked={task.done} onChange={e=>void action({action:"update",id:task.id,done:e.target.checked,title:task.title})}/>
             <div><div style={{textDecoration:task.done?"line-through":"none"}}>{task.title}</div><span className="muted small">PhD · {task.due_date?.slice(0,10)??"No deadline"}</span></div>
           </div><span className="pill">{task.done?"Done":"Open"}</span>
         </label>)}
-        {!visible.length&&<div className="empty">{tasks.length&&!showDone?"No open tasks. Enable “Show completed” to see finished work.":"No tasks found."}</div>}
+        {loading&&<LoadingList label="Loading tasks…"/>}
+        {!loading&&!error&&!visible.length&&<div className="empty">{tasks.length&&!showDone?"No open tasks. Enable “Show completed” to see finished work.":"No tasks found."}</div>}
       </div>
     </section>
   </div>;

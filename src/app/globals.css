@@ -242,3 +242,21 @@ button,input,textarea,select{font-family:inherit}
 .workbench.is-fullscreen .workbench-footer{display:none}
 .workbench.is-fullscreen .literature-scroll{max-height:calc(100dvh - 260px);min-height:180px}
 @media(max-width:520px){.masthead-right{gap:6px}.workbench-fullscreen-button,.workbench-menu-button{padding:6px}.workbench-identity small{overflow-wrap:anywhere}}
+
+
+/* Shared loading states */
+.loading-status{display:inline-flex;align-items:center;gap:7px;font-size:inherit;color:inherit}
+.loading-status svg{flex-shrink:0;animation:phd-spin 1s linear infinite}
+.loading-list{display:grid;gap:10px;padding:12px 0}
+.loading-row{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--border);border-radius:8px}
+.loading-row>span,.loading-row>div>span{display:block;background:var(--panel2);border-radius:4px;animation:phd-pulse 1.6s ease-in-out infinite}
+.loading-row>span{width:32px;height:32px;flex-shrink:0}
+.loading-row>div{display:grid;gap:8px;flex:1}
+.loading-row>div>span:first-child{height:12px;width:78%}
+.loading-row>div>span:last-child{height:8px;width:42%}
+.loading-figure{display:block;position:relative;min-width:0}
+.loading-figure-placeholder{display:flex;align-items:center;justify-content:center;min-height:130px;background:var(--panel2);color:var(--muted);border:1px solid var(--border);border-radius:6px}
+.loading-figure-image{position:absolute!important;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+@keyframes phd-spin{to{transform:rotate(360deg)}}
+@keyframes phd-pulse{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){.loading-status svg,.loading-row span{animation:none}}

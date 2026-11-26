@@ -1,4 +1,5 @@
 "use client";
+import {LoadingList,LoadingStatus} from "@/components/loading";
 import {useCallback,useEffect,useState} from "react";
 
 type Variant={localManifestFound?:boolean;id:string;variantId:string;metadata:{shape:number[];dtype:string;environment:string;sha256:string;sampling:{method:string}}};
@@ -10,6 +11,7 @@ export function Datasets(){
   const [warnings,setWarnings]=useState<string[]>([]);
   const [discoveryEnabled,setDiscoveryEnabled]=useState(false);
   const [loading,setLoading]=useState(true);
+  const [refreshing,setRefreshing]=useState(false);
   const [busy,setBusy]=useState(false);
   const [mode,setMode]=useState<"dataset"|"edit"|"variant"|null>(null);
   const [id,setId]=useState("");
@@ -18,15 +20,16 @@ export function Datasets(){
   const [metadata,setMetadata]=useState("");
   const [filter,setFilter]=useState("");
   const load=useCallback(async()=>{
+    setRefreshing(true);
     try{
       const r=await fetch("/api/datasets",{cache:"no-store"});
       const data=await r.json();
       if(!r.ok)throw Error(data.error);
-      setItems(data.datasets);
+      setItems(data.datasets);setError("");
       setWarnings(data.warnings??[]);
       setDiscoveryEnabled(Boolean(data.discoveryEnabled));
     }catch(e){setError(String(e));}
-    finally{setLoading(false);}
+    finally{setLoading(false);setRefreshing(false); }
   },[]);
   useEffect(()=>{void load();},[load]);
   function open(kind:"dataset"|"edit"|"variant",dataset?:Dataset){
@@ -57,9 +60,9 @@ export function Datasets(){
       <label className="field">Description<textarea className="textarea" maxLength={12000} value={description} onChange={e=>setDescription(e.target.value)}/></label></>}
       <div className="toolbar"><button className="button" disabled={busy}>{busy?"Saving…":"Save"}</button><button type="button" className="button secondary" disabled={busy} onClick={()=>setMode(null)}>Cancel</button></div>
     </form>}
-    <div className="toolbar spaced"><input className="input" aria-label="Search datasets" placeholder="Search datasets" value={filter} onChange={e=>setFilter(e.target.value)}/><span className="muted small">{items.length} datasets</span><button className="button secondary" onClick={()=>void load()}>Refresh</button></div>
+    <div className="toolbar spaced"><input className="input" aria-label="Search datasets" placeholder="Search datasets" value={filter} onChange={e=>setFilter(e.target.value)}/><span className="muted small">{items.length} datasets</span><button className="button secondary" disabled={refreshing} onClick={()=>void load()}>{refreshing?<LoadingStatus label="Refreshing…"/>:"Refresh"}</button></div>
     <div className="experiment-register spaced">
-      {loading?<p className="muted">Loading datasets…</p>:!visible.length?<div className="empty">No matching datasets.</div>:visible.map(d=><article key={d.id} className="experiment-item">
+      {loading?<LoadingList label="Loading datasets…"/>:error?null:!visible.length?<div className="empty">No matching datasets.</div>:visible.map(d=><article key={d.id} className="experiment-item">
         <div className="experiment-item-body">
           <div className="folio-label">{d.id}</div><h2>{d.title}</h2><p>{d.description}</p>
           <div className="toolbar"><button className="button secondary" onClick={()=>open("edit",d)}>Edit</button><button className="button secondary" onClick={()=>open("variant",d)}>Add variant</button></div>

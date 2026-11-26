@@ -1,4 +1,5 @@
 "use client";
+import {LoadingList} from "@/components/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, addMonths, format, getISOWeek, getISOWeekYear, parseISO, startOfISOWeek, subMonths } from "date-fns";
 import ReactMarkdown from "react-markdown";
@@ -38,7 +39,7 @@ export function Journal({ initialDate }: {initialDate?: string}) {
     <div className="panel">
       <div className="page-header"><div><h2 style={{margin:0}}>{heading}</h2><div className="muted small">{filtered.length} entries</div></div><div className="toolbar"><button aria-label="Previous period" className="button secondary" onClick={()=>navigate(-1)}><ChevronLeft size={17}/></button><button className="button secondary" onClick={()=>setCurrent(new Date())}>Today</button><button aria-label="Next period" className="button secondary" onClick={()=>navigate(1)}><ChevronRight size={17}/></button></div></div>
       <div className="segmented" role="group" aria-label="Journal period">{(["DAY","WEEK","MONTH"] as const).map(p=><button className={view===p?"active":""} key={p} onClick={()=>setView(p)}>{p==="DAY"?"Day":p==="WEEK"?"Week":"Month"}</button>)}</div>
-      <div className="spaced">{loading?<div className="loading">Loading…</div>:error?<p className="error">{error}</p>:filtered.length===0?<div className="empty">No entries for this period. Create your first research note.</div>:filtered.map(e=><article className="entry" key={e.id}>
+      <div className="spaced">{loading?<LoadingList label="Loading journal…"/>:error?<p className="error">{error}</p>:filtered.length===0?<div className="empty">No entries for this period. Create your first research note.</div>:filtered.map(e=><article className="entry" key={e.id}>
         <div className="entry-date">{format(parseISO(e.date.slice(0,10)),"d MMM yyyy")} · {e.source==="obsidian"?"Obsidian daily note (read-only)":e.period.toLowerCase()+" journal"}</div>
         <div className="toolbar" style={{justifyContent:"space-between"}}><h3>{e.title}</h3>{e.source!=="obsidian"&&<div className="toolbar"><button className="button secondary" aria-label="Manage links" onClick={()=>setLinking(e)}><Link2 size={14}/></button><button className="button secondary" aria-label="Edit" onClick={()=>setEditing(e)}><Pencil size={14}/></button><button className="button danger" aria-label="Delete" onClick={()=>void remove(e.id)}><Trash2 size={14}/></button></div>}</div>
         <div className="markdown"><ReactMarkdown>{e.content}</ReactMarkdown></div>

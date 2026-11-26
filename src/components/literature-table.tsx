@@ -1,4 +1,5 @@
 "use client";
+import {LoadingList,LoadingStatus} from "@/components/loading";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {Plus,Upload,Download,Search,Trash2,ArrowUpDown} from "lucide-react";
 type Field="paper"|"authors"|"year"|"journal"|"imageType"|"notes";
@@ -8,6 +9,7 @@ const fields:{key:Field;name:string}[]=[
 const empty={paper:"",authors:"",year:"",journal:"",imageType:"",notes:""};
 function quoteCsv(s:string){return '"'+s.replace(/"/g,'""')+'"';}
 export function LiteratureTable(){
+ const [loading,setLoading]=useState(true);
  const [papers,setPapers]=useState<Paper[]>([]);
  const [search,setSearch]=useState("");
  const [sort,setSort]=useState<Field>("paper");
@@ -26,7 +28,7 @@ export function LiteratureTable(){
   if(!r.ok)throw Error(d.error??"Cannot load literature");
   setPapers(d.papers);
  },[]);
- useEffect(()=>{load().catch(e=>setError(String(e)));},[load]);
+ useEffect(()=>{load().catch(e=>setError(String(e))).finally(()=>setLoading(false));},[load]);
  const shown=useMemo(()=>papers.filter(p=>fields.some(f=>p[f.key].toLowerCase().includes(search.toLowerCase())))
   .sort((a,b)=>{const x=a[sort],y=b[sort];const c=sort==="year"?x.localeCompare(y,undefined,{numeric:true}):x.localeCompare(y,undefined,{sensitivity:"base"});return asc?c:-c;}),[papers,search,sort,asc]);
  function sortOn(field:Field){if(field===sort)setAsc(v=>!v);else{setSort(field);setAsc(true);}}
@@ -75,7 +77,7 @@ export function LiteratureTable(){
  return <section className="literature-page">
   <div className="page-header"><div><div className="eyebrow">Research / reference index</div><h1>Literature</h1><p className="muted">A working bibliography. Edit a cell, press Enter or click away to save; press Escape to cancel.</p></div>
    <div className="toolbar"><input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void importFile(file);}}/>
-    <button className="button secondary" disabled={busy} onClick={()=>fileRef.current?.click()}><Upload size={15}/> Import CSV</button>
+    <button className="button secondary" disabled={busy} onClick={()=>fileRef.current?.click()}>{busy?<LoadingStatus label="Working…"/>:<><Upload size={15}/> Import CSV</>}</button>
     <button className="button secondary" onClick={exportCsv}><Download size={15}/> Export CSV</button>
     <button className="button" onClick={()=>setAdding(!adding)}><Plus size={15}/> Add paper</button>
    </div>
@@ -98,7 +100,8 @@ export function LiteratureTable(){
         <button type="button" className="literature-cell" title="Click to edit" onClick={()=>start(p,f.key)}>{p[f.key]||<span className="literature-blank">—</span>}</button>}</td>;
      })}<td><button className="literature-delete" title="Delete reference" aria-label={"Delete "+p.paper} onClick={()=>void remove(p)}><Trash2 size={15}/></button></td></tr>)}</tbody>
    </table>
-   {!shown.length&&<div className="empty">{papers.length?"No matching references.":"No references yet. Import your literature CSV to populate this table."}</div>}
+   {loading&&<LoadingList label="Loading references…"/>}
+   {!loading&&!error&&!shown.length&&<div className="empty">{papers.length?"No matching references.":"No references yet. Import your literature CSV to populate this table."}</div>}
   </div>
   <p className="muted small">Notes are preserved as text, including line breaks. Changes are saved to private PostgreSQL, not to the public GitHub repository.</p>
  </section>;
