@@ -2,9 +2,10 @@
 import {LoadingList,LoadingStatus,LoadingImage} from "@/components/loading";
 import {useCallback,useEffect,useState} from "react";
 import ReactMarkdown from "react-markdown";
+import {RunComparison} from "@/components/run-comparison";
 import {PalmaLaunch} from "@/components/palma-launch";
 
-type Run={id:string;runKey:string;manifest:{environment:string;dataset_id:string;variant_id:string;repository:string;commit:string;status:string;created_at:string};files:{path:string}[]};
+type Run={id:string;runKey:string;manifest:{environment:string;dataset_id:string;variant_id:string;repository:string;commit:string;status:string;created_at:string;dataset_sha256?:string;parameters?:unknown;metric_definitions?:Record<string,string>};files:{path:string}[]};
 function fileUrl(id:string,path:string){return "/api/runs/"+encodeURIComponent(id)+"/file?"+new URLSearchParams({path});}
 function RunReport({run}:{run:Run}){
   const [report,setReport]=useState<string|null>(null);
@@ -55,6 +56,7 @@ export function ExperimentRuns({experimentId}:{experimentId:string}){
     {error&&<p className="error" role="alert">{error}</p>}
     {loading&&<LoadingList label="Loading runs…"/>}
     {!loading&&!error&&!runs.length&&<p className="muted spaced">No imported runs.</p>}
+    <RunComparison runs={runs}/>
     {runs.map(run=><article className="experiment-item spaced" key={run.id}>
       <button className="experiment-item-heading" aria-expanded={selected===run.id} onClick={()=>setSelected(selected===run.id?null:run.id)}><span className="folio-label">{run.manifest.environment}</span><span><strong>{run.runKey}</strong><small>{run.manifest.dataset_id} / {run.manifest.variant_id} · {run.manifest.status}</small></span><span>{selected===run.id?"−":"+"}</span></button>
       {selected===run.id&&<div className="experiment-item-body"><RunReport run={run}/></div>}
