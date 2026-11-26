@@ -51,20 +51,21 @@ async function localDataset(variantId:VariantId,register=true){
   if(await realpath(dir)!==dir)throw Error("Unexpected dataset directory");
   const metadata=validateVariant(JSON.parse((await readFile(join(dir,"manifest.json"),100000)).toString("utf8")));
   if(metadata.dataset_id!==datasetId||metadata.variant_id!==variantId||metadata.environment!=="palma"||!Array.isArray(metadata.shape)||metadata.shape[1]!==variants[variantId]||typeof metadata.sha256!=="string")throw Error("Unexpected local dataset metadata");
-  if(!register)return metadata.sha256;
+  const info={sha256:metadata.sha256,projections:Number(metadata.shape[0])};
+  if(!register)return info;
   await db.researchDataset.upsert({where:{id:datasetId},create:{id:datasetId,title:datasetId},update:{}});
   const variant=await db.datasetVariant.upsert({where:{datasetId_variantId:{datasetId,variantId}},create:{datasetId,variantId,metadata},update:{}});
   if(!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==metadata.sha256||variant.metadata.environment!=="palma")throw Error("Registered dataset conflicts with local manifest");
-  return metadata.sha256;
+  return info;
 }
 export async function availableVariants(){
   if(!configured())return [];
   return Promise.all((Object.keys(variants) as VariantId[]).map(async id=>{
-    try{await localDataset(id,false);return {id,rows:variants[id],available:true};}
-    catch{return {id,rows:variants[id],available:false};}
+    try{const info=await localDataset(id,false);return {id,rows:variants[id],projections:info.projections,available:true};}
+    catch{return {id,rows:variants[id],projections:0,available:false};}
   }));
 }
-export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy"){
+export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy",projectionIndex:unknown=0,sliceIndices:unknown=[0]){
   if(!configured())throw Error("Palma execution is not configured");
   const selected=Array.isArray(input)?input:[input];
   if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
@@ -73,14 +74,17 @@ export async function launch(experimentId:string,input:unknown,commit:unknown,va
   if(!validVariant(variantId))throw Error("Unsupported detector slab");
   if(variantId!=="quick_4rows"&&ratios.length!==1)throw Error("Larger slabs initially support one ratio per run");
   if(!validBackend(backend))throw Error("Unsupported scientific backend");
-  const datasetSha=await localDataset(variantId);
+  const {sha256:datasetSha,projections}=await localDataset(variantId);
+  if(typeof projectionIndex!=="number"||!Number.isSafeInteger(projectionIndex)||projectionIndex<0||projectionIndex>=projections)throw Error("Projection index outside dataset");
+  if(!Array.isArray(sliceIndices)||sliceIndices.length<1||sliceIndices.length>4||new Set(sliceIndices).size!==sliceIndices.length||sliceIndices.some(i=>typeof i!=="number"||!Number.isSafeInteger(i)||i<0||i>=variants[variantId]))throw Error("Choose one to four unique reconstruction slice indices within dataset");
+  const slices=(sliceIndices as number[]).slice().sort((a,b)=>a-b);
   const request=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(712530)`;
     if(await tx.palmaLaunch.findFirst({where:{status:{in:activeStatuses}}}))throw Error("A Palma request is already active; refresh its status first");
-    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,backend,pipelineCommit:commit,datasetSha,status:"dispatching"}});
+    return tx.palmaLaunch.create({data:{id:randomUUID(),experimentId,ratio:ratios[0],ratios,variantId,backend,projectionIndex,slices,pipelineCommit:commit,datasetSha,status:"dispatching"}});
   });
   try{
-    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId,backend}})});
+    const response=await github(workflow+"/dispatches",{method:"POST",body:JSON.stringify({ref:"main",inputs:{request_id:request.id,experiment_id:experimentId,pipeline_commit:commit,ratio:String(ratios[0]),ratios:ratios.join(" "),variant:variantId,backend,projection_index:String(projectionIndex),slices:slices.join(" ")}})});
     if(!response.ok){
       const status=response.status>=500?"unknown":"dispatch_failed";
       return db.palmaLaunch.update({where:{id:request.id},data:{status,message:"GitHub dispatch returned HTTP "+response.status}});
@@ -113,6 +117,8 @@ async function importResult(request:PalmaLaunch,run:GitHubRun){
   if(manifest.experiment_id!==request.experimentId||manifest.run_id!==key||manifest.workflow_run_id!==run.id||manifest.environment!=="palma"||manifest.repository!==repositories[request.backend]||manifest.dataset_id!==datasetId||manifest.variant_id!==variantId||manifest.dataset_sha256!==request.datasetSha||(request.pipelineCommit&&manifest.commit!==request.pipelineCommit))throw Error("Result provenance does not match request");
   const parameters=manifest.parameters;
   if(!parameters||typeof parameters!=="object"||Array.isArray(parameters)||JSON.stringify((parameters as Record<string,unknown>).ratios)!==JSON.stringify(request.ratios.length?request.ratios:[request.ratio]))throw Error("Result ratio differs from request");
+  const visual=parameters as Record<string,unknown>;
+  if(visual.projection_index!==request.projectionIndex||!isDeepStrictEqual(visual.slices,request.slices))throw Error("Result visual indices differ from request");
   if(manifest.status!==(run.conclusion==="success"?"completed":"failed"))throw Error("Result status differs from workflow");
   const variant=await db.datasetVariant.findUnique({where:{datasetId_variantId:{datasetId,variantId}}});
   if(!variant||!variant.metadata||typeof variant.metadata!=="object"||Array.isArray(variant.metadata)||variant.metadata.sha256!==request.datasetSha||variant.metadata.environment!=="palma")throw Error("Dataset registration changed");
