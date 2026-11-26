@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {db} from "@/lib/db";
-import {activeStatuses,configured,launch,syncLaunch} from "@/lib/palma";
+import {activeStatuses,availableVariants,configured,launch,syncLaunch} from "@/lib/palma";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 type Context={params:Promise<{id:string}>};
@@ -8,7 +8,7 @@ type Context={params:Promise<{id:string}>};
 export async function GET(_request:NextRequest,{params}:Context){
   const {id}=await params;
   const launches=await db.palmaLaunch.findMany({where:{experimentId:id},orderBy:{createdAt:"desc"},take:30});
-  return NextResponse.json({launches,configured:configured()},{headers:{"Cache-Control":"private, no-store"}});
+  return NextResponse.json({launches,configured:configured(),variants:await availableVariants()},{headers:{"Cache-Control":"private, no-store"}});
 }
 export async function POST(request:NextRequest,{params}:Context){
   try{
@@ -16,7 +16,7 @@ export async function POST(request:NextRequest,{params}:Context){
     const {id}=await params;
     const body=await request.json();
     if(body.action==="launch"){
-      const record=await launch(id,body.ratios??body.ratio,body.commit);
+      const record=await launch(id,body.ratios??body.ratio,body.commit,body.variant);
       return NextResponse.json(record,{status:201});
     }
     if(body.action==="sync"){
