@@ -5,6 +5,7 @@ import type {Prisma} from "@prisma/client";
 export const MAX_BUNDLE=32*1024*1024;
 const MAX_FILE=12*1024*1024;
 const MAX_TOTAL=64*1024*1024;
+export const LOCAL_BUNDLE_LIMITS={archive:128*1024*1024,total:256*1024*1024};
 const extensions=/\.(json|csv|md|png|jpe?g|webp|ya?ml|log|txt)$/i;
 export function safePath(path:string){
   return path.length<=400&&path.split("/").every(p=>/^[A-Za-z0-9_-][A-Za-z0-9_. -]*$/.test(p))&&extensions.test(path);
@@ -31,8 +32,9 @@ function crc32(data:Buffer){
   for(const byte of data){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
   return (crc^0xffffffff)>>>0;
 }
-export function unpackBundle(zip:Buffer){
-  if(zip.length>MAX_BUNDLE||zip.length<22)throw Error("Invalid ZIP size");
+export function unpackBundle(zip:Buffer,limits={archive:MAX_BUNDLE,total:MAX_TOTAL}){
+  if(zip.length<22)throw Error("Invalid ZIP size");
+  if(zip.length>limits.archive)throw Error(`ZIP exceeds ${limits.archive/1024**2} MiB (${zip.length} bytes)`);
   let end=zip.length-22;
   while(end>=Math.max(0,zip.length-65557)){
     if(zip.readUInt32LE(end)===0x06054b50&&end+22+zip.readUInt16LE(end+20)===zip.length)break;
@@ -51,7 +53,9 @@ export function unpackBundle(zip:Buffer){
     if(pos+46+n+extra+comment>end||flags&~0x808||![0,8].includes(method)||zip.readUInt16LE(pos+34)||(mode&0xf000)===0xa000)throw Error("Unsupported ZIP entry");
     const name=zip.toString("utf8",pos+46,pos+46+n);
     pos+=46+n+extra+comment;
-    if(!safePath(name)||files.has(name)||length>MAX_FILE||total+length>MAX_TOTAL)throw Error("Unsafe path, duplicate or oversized file");
+    if(!safePath(name)||files.has(name))throw Error("Unsafe path or duplicate file");
+    if(length>MAX_FILE)throw Error(`File exceeds ${MAX_FILE/1024**2} MiB: ${name}`);
+    if(total+length>limits.total)throw Error(`Expanded ZIP exceeds ${limits.total/1024**2} MiB`);
     if(offset+30>start||zip.readUInt32LE(offset)!==0x04034b50||zip.readUInt16LE(offset+6)!==flags||zip.readUInt16LE(offset+8)!==method)throw Error("Invalid ZIP local header");
     const localName=zip.readUInt16LE(offset+26), localExtra=zip.readUInt16LE(offset+28), dataStart=offset+30+localName+localExtra;
     if(dataStart+compressed>start||zip.toString("utf8",offset+30,offset+30+localName)!==name)throw Error("Invalid ZIP file bounds");
