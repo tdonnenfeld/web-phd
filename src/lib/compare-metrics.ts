@@ -39,3 +39,29 @@ export function matchMeasurements(a:Measurement[],b:Measurement[]){
 export function nearlyEqual(a:number,b:number,relative=1e-6){
   return a===b||Math.abs(a-b)<=relative*Math.max(Math.abs(a),Math.abs(b));
 }
+
+export const propagationStages=["Projection","Normalization","Absorbance","Padding","Reconstruction"] as const;
+export const transitionLabels=["Proj → Norm","Norm → Abs","Abs → Pad","Pad → Recon"] as const;
+
+export function propagationRows(measurements:Measurement[]){
+  const groups=new Map<string,Measurement[]>();
+  for(const row of measurements){
+    if(!propagationStages.some(stage=>stage===row.stage))continue;
+    const key=row.ratio===null?"bps:"+row.bps:"ratio:"+row.ratio;
+    const group=groups.get(key)??[];
+    group.push(row);
+    groups.set(key,group);
+  }
+  return Array.from(groups.values()).filter(group=>group.some(row=>row.stage!=="Reconstruction")).map(group=>{
+    const first=group.find(row=>row.stage==="Projection")??group[0];
+    const consistent=group.every(row=>row.bps===first.bps);
+    const values=propagationStages.slice(1).map((stage,i)=>{
+      const before=group.find(row=>row.stage===propagationStages[i])?.normalized_mse;
+      const after=group.find(row=>row.stage===stage)?.normalized_mse;
+      if(!consistent||before===undefined||before===null||before<=0||after===undefined||after===null||after<0)return null;
+      const value=after/before;
+      return Number.isFinite(value)?value:null;
+    });
+    return {ratio:first.ratio,bps:first.bps,consistent,values};
+  }).sort((a,b)=>a.bps-b.bps);
+}

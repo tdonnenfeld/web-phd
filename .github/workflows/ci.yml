@@ -13,6 +13,7 @@ jobs:
           node-version: "22"
       - run: npm install --no-audit --no-fund
       - run: npx prisma generate
+      - run: node --experimental-strip-types --test tests/propagation.test.mjs
       - run: npm run build
         env:
           DATABASE_URL: postgresql://phd:placeholder@localhost:5432/phd_hub
