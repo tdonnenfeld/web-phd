@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
+import {PropagationComparison} from "@/components/propagation-comparison";
 import {RDCurves} from "@/components/rd-curves";
 import {LoadingStatus} from "@/components/loading";
 import {parseMeasurements,matchMeasurements,nearlyEqual,type Measurement} from "@/lib/compare-metrics";
@@ -62,6 +63,7 @@ export function RunComparison({runs}:{runs:Run[]}){
     {error&&<p className="error" role="alert">{error}</p>}
     {result&&<div className="spaced">
       <RDCurves key={left+":"+right+":"+extraKey} series={[{label:"A · "+(a?a.manifest.dataset_id+" / "+method(a):"Reference"),rows:result.a},{label:"B · "+(b?b.manifest.dataset_id+" / "+method(b):"Comparison"),rows:result.b},...result.extra]}/>
+      <PropagationComparison key={left+":"+right+":"+extraKey} series={[{label:"A · "+(a?a.manifest.dataset_id+" / "+method(a):"Reference"),rows:result.a},{label:"B · "+(b?b.manifest.dataset_id+" / "+method(b):"Comparison"),rows:result.b},...result.extra]}/>
       <p className="muted small">Cross-method or cross-sample differences at equal requested ratios may reflect different achieved bitrates. Compare curves at overlapping achieved BPS; NMSE uses each run’s own reference range.</p>
       <h3>Pairwise metrics (A/B)</h3>
       <p className="muted small">{pairs.length} matched stage/rate pairs · {result.a.length-pairs.length} unmatched in A · {result.b.length-pairs.length} unmatched in B. Matched by requested ratio when present, otherwise exact achieved BPS.</p>
