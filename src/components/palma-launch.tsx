@@ -22,7 +22,7 @@ export function PalmaLaunch({experimentId,onImported}:{experimentId:string;onImp
   const projectionIndex=Number(projection);
   const validIndices=Boolean(dataset&&projection.trim()!==""&&Number.isSafeInteger(projectionIndex)&&projectionIndex>=0&&projectionIndex<dataset.projections&&slices.length>=1&&slices.length<=4&&slices.every(i=>i>=0&&i<dataset.rows));
   const [commit,setCommit]=useState("");
-  const [backend,setBackend]=useState("legacy");
+  const [backend,setBackend]=useState("unified");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const inFlight=useRef(false);
