@@ -72,7 +72,7 @@ export async function availableVariants(){
   })));
   return found.filter(v=>v!==null);
 }
-export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="legacy",projectionIndex:unknown=0,sliceIndices:unknown=[0],datasetId:unknown="sample_0001",method:unknown="mct"){
+export async function launch(experimentId:string,input:unknown,commit:unknown,variantId:unknown="quick_4rows",backend:unknown="unified",projectionIndex:unknown=0,sliceIndices:unknown=[0],datasetId:unknown="sample_0001",method:unknown="mct"){
   if(!configured())throw Error("Palma execution is not configured");
   const selected=Array.isArray(input)?input:[input];
   if(!selected.length||selected.length>6||selected.some(r=>typeof r!=="number"||![2,4,8,16,32,64].includes(r))||new Set(selected).size!==selected.length||typeof commit!=="string"||(commit!==""&&!/^[a-f0-9]{40}$/.test(commit)))throw Error("Invalid ratio or commit");
